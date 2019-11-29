@@ -38,6 +38,13 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
     data = batch['data']
     segs = batch['seg']
     pids = batch['pid']
+
+    # GG
+    if segs.shape[1] != data.shape[1]:
+      print("Plot Warning: multiple GT occurences")
+      # Suppress oune dimmension
+      segs =  segs[:,0, :,:,:]
+
     # for 3D, repeat pid over batch elements.
     if len(set(pids)) == 1:
         pids = [pids] * data.shape[0]

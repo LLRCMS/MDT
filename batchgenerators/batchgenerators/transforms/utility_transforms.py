@@ -234,6 +234,23 @@ class ConvertSegToBoundingBoxCoordinates(AbstractTransform):
         return data_dict
 
 
+class NullOperation(AbstractTransform):
+    """ Converts segmentation masks into bounding box coordinates.
+    """
+
+    def __init__(self, dim, get_rois_from_seg_flag=False, class_specific_seg_flag=False):
+        self.dim = dim
+        self.get_rois_from_seg_flag = get_rois_from_seg_flag
+        self.class_specific_seg_flag = class_specific_seg_flag
+
+    def __call__(self, **data_dict):
+        # GG begin
+        # data_dict = convert_seg_to_bounding_box_coordinates(data_dict, self.dim, self.get_rois_from_seg_flag, class_specific_seg_flag=self.class_specific_seg_flag)
+        data_dict = null_operation(data_dict)
+        # GG end
+        return data_dict
+
+
 class MoveSegToDataChannel(AbstractTransform):
     """
     concatenates data_dict['seg'] to data_dict['data']

@@ -1,0 +1,12 @@
+Metadata-Version: 1.1
+Name: batchgenerators
+Version: 0.19.5
+Summary: Data augmentation toolkit
+Home-page: https://github.com/MIC-DKFZ/batchgenerators
+Author: Division of Medical Image Computing, German Cancer Research Center
+Author-email: f.isensee@dkfz-heidelberg.de
+License: Apache License Version 2.0, January 2004
+Download-URL: https://github.com/MIC-DKFZ/batchgenerators/archive/v0.19.5.tar.gz
+Description: UNKNOWN
+Keywords: deep learning,image segmentation,image classification,medical image analysis,medical image segmentation,data augmentation
+Platform: UNKNOWN

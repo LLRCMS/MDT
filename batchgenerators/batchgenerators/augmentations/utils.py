@@ -516,9 +516,11 @@ def convert_seg_to_bounding_box_coordinates(data_dict, dim, get_rois_from_seg_fl
         roi_labels = []
         out_seg = np.copy(data_dict['seg'])
         # GG
+        """
         print(">> convert_seg_to_bb")
         print("data_dict['seg'].shape ", data_dict['seg'].shape )
         print ("get_rois_from_seg_flag", get_rois_from_seg_flag)
+        """
         for b in range(data_dict['seg'].shape[0]):
 
             p_coords_list = []
@@ -572,12 +574,14 @@ def convert_seg_to_bounding_box_coordinates(data_dict, dim, get_rois_from_seg_fl
         data_dict['roi_masks'] = np.array(roi_masks)
         data_dict['roi_labels'] = np.array(roi_labels)
         data_dict['seg'] = out_seg
-        print("Outpout :")
+        # GG
+        """
+        print(" convert_seg_to_bounding_box_coordinates, outpout :")
         print(" data_dict['data'].shape ", data_dict['data'].shape )
         print(" data_dict['roi_masks'].shape ", data_dict['roi_masks'].shape )
         print(" data_dict['bb_target'].shape ", data_dict['bb_target'].shape )
         print(" data_dict['roi_labels'].shape ", data_dict['roi_labels'].shape )
-
+        """
         
         return data_dict
 

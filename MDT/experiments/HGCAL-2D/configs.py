@@ -28,7 +28,7 @@ class configs(DefaultConfigs):
         #    Preprocessing      #
         #########################
 
-        self.root_dir = '/home/llr/info/grasseau/MDT/MDT/experiments/toy_exp/data'
+        self.root_dir = '/data_CMS_upgrade/grasseau/HGCAL-2D/DataSet/'
 
         #########################
         #         I/O           #
@@ -40,37 +40,33 @@ class configs(DefaultConfigs):
 
         # one out of ['mrcnn', 'retina_net', 'retina_unet', 'detection_unet', 'ufrcnn', 'detection_unet'].
         self.model = 'ufrcnn'
+        self.model = 'mrcnn'
+        
 
         DefaultConfigs.__init__(self, self.model, server_env, self.dim)
 
         # int [0 < dataset_size]. select n patients from dataset for prototyping.
         self.select_prototype_subset = None
         self.hold_out_test_set = True
-        self.n_train_data = 1000
-
+        
         # choose one of the 3 toy experiments described in https://arxiv.org/pdf/1811.08661.pdf
         # one of ['donuts_shape', 'donuts_pattern', 'circles_scale'].
-        toy_mode = 'donuts_shape'
-        # GG
-        toy_mode = 'donuts_pattern'
+        # toy_mode = 'donuts_shape'
 
 
         # path to preprocessed data.
-        self.input_df_name = 'info_df.pickle'
-        self.pp_name = os.path.join(toy_mode, 'train')
-        self.pp_data_path = os.path.join(self.root_dir, self.pp_name)
-        self.pp_test_name = os.path.join(toy_mode, 'test')
-        self.pp_test_data_path = os.path.join(self.root_dir, self.pp_test_name)
+        self.input_train_name = 'train.layer.12-20-20000.obj'
+
+        # GG TODO not relevant variable name
+        self.pp_data_path = os.path.join(self.root_dir, self.input_train_name)
+        # GG Not used
+        self.input_test_name = 'eval-layer.12-20-100.obj'        
+        self.pp_test_data_path = os.path.join(self.root_dir, self.input_test_name)
 
         # settings for deployment in cloud.
         if server_env:
-            # path to preprocessed data.
-            pp_root_dir = '/path/to/data'
-            self.pp_name = os.path.join(toy_mode, 'train')
-            self.pp_data_path = os.path.join(pp_root_dir, self.pp_name)
-            self.pp_test_name = os.path.join(toy_mode, 'test')
-            self.pp_test_data_path = os.path.join(pp_root_dir, self.pp_test_name)
-            self.select_prototype_subset = None
+            print("Error: mode not available")
+            exit()
 
         #########################
         #      Data Loader      #
@@ -81,8 +77,9 @@ class configs(DefaultConfigs):
         self.n_channels = len(self.channels)
 
         # patch_size to be used for training. pre_crop_size is the patch_size before data augmentation.
-        self.pre_crop_size_2D = [320, 320]
-        self.patch_size_2D = [320, 320]
+        # GG set the cropped size to run successfully the program
+        self.pre_crop_size_2D = [256, 256]
+        self.patch_size_2D = [256, 256]
 
         self.patch_size = self.patch_size_2D if self.dim == 2 else self.patch_size_3D
         self.pre_crop_size = self.pre_crop_size_2D if self.dim == 2 else self.pre_crop_size_3D
@@ -126,11 +123,11 @@ class configs(DefaultConfigs):
         self.do_validation = True
         # decide whether to validate on entire patient volumes (like testing) or sampled patches (like training)
         # the former is morge accurate, while the latter is faster (depending on volume size)
-        self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
-        if self.val_mode == 'val_patient':
-            self.max_val_patients = None  # if 'None' iterates over entire val_set once.
-        if self.val_mode == 'val_sampling':
-            self.num_val_batches = 50
+        # GG
+        # self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
+        self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
+        # GG TODO confusing name .num_val_batches ... validation_size
+        self.num_val_batches = 50
 
         #########################
         #   Testing / Plotting  #
@@ -158,12 +155,12 @@ class configs(DefaultConfigs):
 
         self.plot_prediction_histograms = True
         self.plot_stat_curves = False
-        # GG
+        # GG TODO or Not
         # ??? self.plot_dir = os.path.join( self.exp_dir
         #########################
         #   Data Augmentation   #
         #########################
-
+        # GG TODO unused in our experiment 
         self.da_kwargs={
         'do_elastic_deform': True,
         'alpha':(0., 1500.),
@@ -348,3 +345,14 @@ class configs(DefaultConfigs):
             if self.model == 'retina_unet':
                 self.operate_stride1 = True
                 self.class_specific_seg_flag = True
+        # GG
+        # Debug
+        # 
+        # Shuffle data inputs
+        self.debug_deactivate_shuffling = False
+        self.debug_detection_target_layer = False
+        self.debug_compute_rpn_class = False
+
+        # Data Set: batch generator, ...
+        self.debug_generate_train_batch = False
+        self.debug_data_loader = False

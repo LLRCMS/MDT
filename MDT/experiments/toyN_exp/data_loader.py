@@ -51,6 +51,8 @@ def get_train_generators(cf, logger):
     train_data = {k: v for (k, v) in all_data.items() if any(p == v['pid'] for p in train_pids)}
     val_data = {k: v for (k, v) in all_data.items() if any(p == v['pid'] for p in val_pids)}
 
+    # ??? print("GG train_data ???",  train_data )
+
     logger.info("data set loaded with: {} train / {} val patients".format(len(train_pids), len(val_pids)))
     batch_gen = {}
     batch_gen['train'] = create_data_gen_pipeline(train_data, cf=cf, do_aug=False)
@@ -237,9 +239,13 @@ class BatchGenerator(SlimDataLoaderBase):
         batch_data, batch_segs, batch_pids, batch_targets = [], [], [], []
         class_targets_list =  [v['class_target'] for (k, v) in self._data.items()]
 
+        print(">>generate_train_batch ")
+        # print("  self.cf.batch_sample_slack", self.cf.batch_sample_slack)
+        # print("  class_targets_list", class_targets_list)
         #samples patients towards equilibrium of foreground classes on a roi-level (after randomly sampling the ratio "batch_sample_slack).
         batch_ixs = dutils.get_class_balanced_patients(
             class_targets_list, self.batch_size, self.cf.head_classes - 1, slack_factor=self.cf.batch_sample_slack)
+        # print ("batch_ixs ", batch_ixs)
         patients = list(self._data.items())
 
         for b in batch_ixs:

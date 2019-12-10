@@ -173,7 +173,7 @@ class Mask(nn.Module):
 #  Loss Functions
 ############################################################
 
-def compute_rpn_class_loss(rpn_match, rpn_class_logits, shem_poolsize):
+def compute_rpn_class_loss(cfg, rpn_match, rpn_class_logits, shem_poolsize):
     """
     :param rpn_match: (n_anchors). [-1, 0, 1] for negative, neutral, and positive matched anchors.
     :param rpn_class_logits: (n_anchors, 2). logits from RPN classifier.
@@ -187,9 +187,17 @@ def compute_rpn_class_loss(rpn_match, rpn_class_logits, shem_poolsize):
     pos_indices = torch.nonzero(rpn_match == 1)
     neg_indices = torch.nonzero(rpn_match == -1)
 
+    # Debug
+    if cfg.debug_compute_rpn_class:
+      print( ">>> compute_rpn_class")  
+      print("  rpn_match.size", rpn_match.size() )
+
     # loss for positive samples
     if 0 not in pos_indices.size():
         pos_indices = pos_indices.squeeze(1)
+        # Debug
+        if cfg.debug_compute_rpn_class:
+          print( "  rpn_class_logits.size", rpn_class_logits.size() )
         roi_logits_pos = rpn_class_logits[pos_indices]
         pos_loss = F.cross_entropy(roi_logits_pos, torch.LongTensor([1] * pos_indices.shape[0]).cuda())
     else:
@@ -477,6 +485,9 @@ def detection_target_layer(batch_proposals, batch_mrcnn_class_scores, batch_gt_c
     :return: target_deltas: (n_sampled_rois, 2 * dim) containing target deltas of sampled proposals for box refinement.
     :return: target_masks: (n_sampled_rois, y, x, (z)) containing target masks of sampled proposals.
     """
+    if cf.debug_detection_target_layer :
+      print( ">>> detection_target_layer")
+
     # normalization of target coordinates
     if cf.dim == 2:
         h, w = cf.patch_size
@@ -509,6 +520,8 @@ def detection_target_layer(batch_proposals, batch_mrcnn_class_scores, batch_gt_c
         batch_element_indices = torch.nonzero(batch_proposals[:, -1] == b).squeeze(1)
 
         # Compute overlaps matrix [proposals, gt_boxes]
+        if cf.debug_detection_target_layer :
+          print( "  proposals, gt_boxes",  proposals.size(), gt_boxes.size())
         if 0 not in gt_boxes.size():
             if gt_boxes.shape[1] == 4:
                 overlaps = mutils.bbox_overlaps_2D(proposals, gt_boxes)
@@ -526,11 +539,18 @@ def detection_target_layer(batch_proposals, batch_mrcnn_class_scores, batch_gt_c
             negative_roi_bool = torch.from_numpy(np.array([1]*proposals.shape[0])).cuda()
 
         # Sample Positive ROIs
+        if cf.debug_detection_target_layer:
+           print( "  positive_roi_bool", positive_roi_bool.size() )
         if 0 not in torch.nonzero(positive_roi_bool).size():
             positive_indices = torch.nonzero(positive_roi_bool).squeeze(1)
             positive_samples = int(cf.train_rois_per_image * cf.roi_positive_ratio)
             rand_idx = torch.randperm(positive_indices.size()[0])
             rand_idx = rand_idx[:positive_samples].cuda()
+            if cf.debug_detection_target_layer:
+              print( "  Positive ROIs ")
+              print( "    positive_indices", positive_indices.size() )
+              print( "    positive_samples", positive_samples )
+              print( "    rand_idx", rand_idx.size() )
             positive_indices = positive_indices[rand_idx]
             positive_samples = positive_indices.size()[0]
             positive_rois = proposals[positive_indices, :]
@@ -568,6 +588,8 @@ def detection_target_layer(batch_proposals, batch_mrcnn_class_scores, batch_gt_c
             sample_class_ids.append(roi_gt_class_ids)
             positive_count += positive_samples
         else:
+            if cf.debug_detection_target_layer:
+              print( "NO Positive ROIs ")
             positive_samples = 0
 
         # Negative ROIs. Add enough to maintain positive:negative ratio, but at least 1. Sample via SHEM.
@@ -586,9 +608,21 @@ def detection_target_layer(batch_proposals, batch_mrcnn_class_scores, batch_gt_c
         target_class_ids = torch.cat(sample_class_ids)
 
     # Pad target information with zeros for negative ROIs.
+    if cf.debug_detection_target_layer:
+      print( "  positive_count, negative_count", positive_count, negative_count )
     if positive_count > 0 and negative_count > 0:
         sample_indices = torch.cat((torch.cat(sample_positive_indices), torch.cat(sample_negative_indices)), dim=0)
         zeros = torch.zeros(negative_count).int().cuda()
+        if cf.debug_detection_target_layer :
+          print( "  sample_positive/negative_indices", 
+            len(sample_positive_indices), len(sample_negative_indices ) )
+          print( "  sample_indices", sample_indices.size() )
+          print( "  target_class_ids, zeros", target_class_ids.size(), zeros.size() )
+
+        # GG 
+        if( target_class_ids.size()[-1] == 1):
+            target_class_ids = torch.squeeze(target_class_ids, -1)
+ 
         target_class_ids = torch.cat([target_class_ids, zeros], dim=0)
         zeros = torch.zeros(negative_count, cf.dim * 2).cuda()
         target_deltas = torch.cat([target_deltas, zeros], dim=0)
@@ -610,6 +644,10 @@ def detection_target_layer(batch_proposals, batch_mrcnn_class_scores, batch_gt_c
         target_deltas = torch.FloatTensor().cuda()
         target_masks = torch.FloatTensor().cuda()
 
+    if cf.debug_detection_target_layer:
+      print( "  sample_indices, target_class_ids, target_deltas, target_masks", 
+           sample_indices.size(), target_class_ids.size(), target_deltas.size(), target_masks.size())
+ 
     return sample_indices, target_class_ids, target_deltas, target_masks
 
 
@@ -906,7 +944,8 @@ class net(nn.Module):
             rpn_target_deltas = torch.from_numpy(rpn_target_deltas).float().cuda()
 
             # compute RPN losses.
-            rpn_class_loss, neg_anchor_ix = compute_rpn_class_loss(rpn_match, rpn_class_logits[b], self.cf.shem_poolsize)
+            # GG add cf in parameter fct
+            rpn_class_loss, neg_anchor_ix = compute_rpn_class_loss(self.cf, rpn_match, rpn_class_logits[b], self.cf.shem_poolsize)
             rpn_bbox_loss = compute_rpn_bbox_loss(rpn_target_deltas, rpn_pred_deltas[b], rpn_match)
             batch_rpn_class_loss += rpn_class_loss / img.shape[0]
             batch_rpn_bbox_loss += rpn_bbox_loss / img.shape[0]

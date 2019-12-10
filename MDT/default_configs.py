@@ -95,7 +95,7 @@ class DefaultConfigs:
 
         # color specifications for all box_types in prediction_plot.
         self.box_color_palette = {'det': 'b', 'gt': 'r', 'neg_class': 'purple',
-                                  'prop': 'w', 'pos_class': 'g', 'pos_anchor': 'c', 'neg_anchor': 'c'}
+                                  'prop': 'w', 'pos_class': 'g', 'pos_anchor': 'c', 'neg_anchor': 'gray'}
 
         # scan over confidence score in evaluation to optimize it on the validation set.
         self.scan_det_thresh = False

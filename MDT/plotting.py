@@ -36,14 +36,36 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
         outfile = os.path.join(cf.plot_dir, 'pred_example_{}.png'.format(cf.fold))
 
     data = batch['data']
-    segs = batch['seg']
+    # GG segs = batch['seg']
+    segs_ = batch['roi_masks']
+    # print("len(seg), segs[0].shape", len(segs), segs[0].shape)
     pids = batch['pid']
+    data = np.asarray( data ) 
+    segs = np.zeros( (len(segs_), 1, segs_[0].shape[1], segs_[0].shape[2], segs_[0].shape[3] ) ) 
+    for b in range(len( segs_ )):
+      segs[b,:,:,:] = segs_[b][0, :, :, :]
 
-    # GG
-    if segs.shape[1] != data.shape[1]:
+    print("len, shape", len(segs), segs.shape)
+    # segs = np.asarray( segs )
+    # segs = np.reshape( segs, (len(segs), shape[0], shape[1], shape[2], shape[3] ) )
+    segs = np.concatenate (segs, axis=0)
+    print("len, shape", len(segs), segs.shape)
+    pids = np.asarray( pids )
+    print ("pids.size ", pids.size)
+
+    # GG  
+    print("  segs.shape, data.shape ", segs.shape, data.shape, pids.shape )
+    if segs.shape[1] != 1:
       print("Plot Warning: multiple GT occurences")
-      # Suppress oune dimmension
-      segs =  segs[:,0, :,:,:]
+      segs = segs[:, 0, :,:,:]
+      pids = pids[:, 0, :]
+      # Suppress one dimmension
+      # masks = []
+      # for b in range(len(segs)):
+      #   masks.append( segs[b][0, :, :, :] ) 
+      #segs =  masks
+      print("segs.shape ", segs.shape )
+
 
     # for 3D, repeat pid over batch elements.
     if len(set(pids)) == 1:
@@ -51,7 +73,7 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
 
     seg_preds = results_dict['seg_preds']
     roi_results = deepcopy(results_dict['boxes'])
-
+    print("GG roi_results", roi_results)
     # Randomly sampled one patient of batch and project data into 2D slices for plotting.
     if cf.dim == 3:
         patient_ix = np.random.choice(data.shape[0])
@@ -80,7 +102,7 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
         segs = np.transpose(segs[patient_ix], axes=(3, 0, 1, 2))[z_cuts[0]: z_cuts[1]]
         seg_preds = np.transpose(seg_preds[patient_ix], axes=(3, 0, 1, 2))[z_cuts[0]: z_cuts[1]]
         pids = [pids[patient_ix]] * data.shape[0]
-
+    
     try:
         # all dimensions except for the 'channel-dimension' are required to match
         for i in [0, 2, 3]:
@@ -113,7 +135,9 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
                 vmax = cf.num_seg_classes - 1
 
             if m == 0:
-                plt.title('{}'.format(pids[b][:10]), fontsize=20)
+                print("GG b, pids", b, pids, pids[b])
+                # plt.title('{}'.format(pids[b][:10]), fontsize=20)
+                plt.title('{}'.format(pids[b]), fontsize=20)
 
             plt.imshow(arr, cmap=cmap, vmin=vmin, vmax=vmax)
             if m >= (data.shape[1]):
@@ -125,7 +149,7 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
                             if box['box_pred_class_id'] > 0 and box['box_score'] > 0.1:
                                 plot_text = True
                                 score = np.max(box['box_score'])
-                                score_text = '{}|{:.0f}'.format(box['box_pred_class_id'], score*100)
+                                score_text = 'sc{}|{:.0f}'.format(box['box_pred_class_id'], score*100)
                                 # if prob detection: plot only boxes from correct sampling instance.
                                 if 'sample_id' in box.keys() and int(box['sample_id']) != m - data.shape[1] - 2:
                                         continue
@@ -141,7 +165,7 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
                                 continue
                         elif box['box_type'] == 'gt':
                             plot_text = True
-                            score_text = int(box['box_label'])
+                            score_text = 's'+ str( int(box['box_label']) )
                             score_font_size = 7
                             text_color = 'r'
                             text_x = coords[1]

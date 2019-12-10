@@ -28,7 +28,7 @@ class configs(DefaultConfigs):
         #    Preprocessing      #
         #########################
 
-        self.root_dir = '/home/llr/info/grasseau/MDT/MDT/experiments/toy_exp/data'
+        self.root_dir = '/data_CMS_upgrade/grasseau/MDT/toy_exp'
 
         #########################
         #         I/O           #
@@ -40,6 +40,8 @@ class configs(DefaultConfigs):
 
         # one out of ['mrcnn', 'retina_net', 'retina_unet', 'detection_unet', 'ufrcnn', 'detection_unet'].
         self.model = 'ufrcnn'
+        self.model = 'mrcnn'
+        
 
         DefaultConfigs.__init__(self, self.model, server_env, self.dim)
 
@@ -47,6 +49,7 @@ class configs(DefaultConfigs):
         self.select_prototype_subset = None
         self.hold_out_test_set = True
         self.n_train_data = 1000
+        self.n_train_data = 20
 
         # choose one of the 3 toy experiments described in https://arxiv.org/pdf/1811.08661.pdf
         # one of ['donuts_shape', 'donuts_pattern', 'circles_scale'].
@@ -116,7 +119,7 @@ class configs(DefaultConfigs):
         #########################
 
         self.num_epochs = 100
-        self.num_train_batches = 200 if self.dim == 2 else 200
+        self.num_train_batches = 2 if self.dim == 2 else 200
         self.batch_size = 20 if self.dim == 2 else 8
         # GG
         self.batch_size = 2
@@ -124,11 +127,15 @@ class configs(DefaultConfigs):
         self.do_validation = True
         # decide whether to validate on entire patient volumes (like testing) or sampled patches (like training)
         # the former is morge accurate, while the latter is faster (depending on volume size)
-        self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
+        # GG
+        # self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
+        self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
+
         if self.val_mode == 'val_patient':
             self.max_val_patients = None  # if 'None' iterates over entire val_set once.
         if self.val_mode == 'val_sampling':
             self.num_val_batches = 50
+            self.num_val_batches = 5
 
         #########################
         #   Testing / Plotting  #

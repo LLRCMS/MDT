@@ -17,8 +17,7 @@ import numpy as np
 
 # GG
 from batchgenerators.augmentations.utils import convert_seg_image_to_one_hot_encoding, \
-    convert_seg_to_bounding_box_coordinates, transpose_channels, \
-    null_operation
+    convert_seg_to_bounding_box_coordinates, transpose_channels, null_operation
 from batchgenerators.transforms.abstract_transforms import AbstractTransform
 
 

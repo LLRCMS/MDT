@@ -28,7 +28,7 @@ class configs(DefaultConfigs):
         #    Preprocessing      #
         #########################
 
-        self.root_dir = '/data_CMS_upgrade/grasseau/HGCAL-2D/DataSet/'
+        self.root_dir = './dataset/' #'/data_CMS_upgrade/grasseau/HGCAL-2D/DataSet/'
 
         #########################
         #         I/O           #
@@ -39,21 +39,14 @@ class configs(DefaultConfigs):
         self.dim = 2
 
         # one out of ['mrcnn', 'retina_net', 'retina_unet', 'detection_unet', 'ufrcnn', 'detection_unet'].
-        self.model = 'ufrcnn'
         self.model = 'mrcnn'
-        
 
         DefaultConfigs.__init__(self, self.model, server_env, self.dim)
 
-        # int [0 < dataset_size]. select n patients from dataset for prototyping.
+        # int [0 < dataset_size]. select n samples from dataset for prototyping.
         self.select_prototype_subset = None
         self.hold_out_test_set = True
         
-        # choose one of the 3 toy experiments described in https://arxiv.org/pdf/1811.08661.pdf
-        # one of ['donuts_shape', 'donuts_pattern', 'circles_scale'].
-        # toy_mode = 'donuts_shape'
-
-
         # path to preprocessed data.
         self.input_train_name = 'train.layer.12-20-20000.obj'
 
@@ -71,15 +64,18 @@ class configs(DefaultConfigs):
         #########################
         #      Data Loader      #
         #########################
+        # set number of samples for dataset, shapes.py will use this value to generate dataset
+        self.num_samples = 1000 
+        self.num_classes = 4
+
 
         # select modalities from preprocessed data
-        self.channels = [0]
-        self.n_channels = len(self.channels)
+        self.n_channels = 3 
 
         # patch_size to be used for training. pre_crop_size is the patch_size before data augmentation.
         # GG set the cropped size to run successfully the program
-        self.pre_crop_size_2D = [256, 256]
-        self.patch_size_2D = [256, 256]
+        self.pre_crop_size_2D = [320, 320] # [256, 256]
+        self.patch_size_2D = [320, 320 ]# [256, 256]
 
         self.patch_size = self.patch_size_2D if self.dim == 2 else self.patch_size_3D
         self.pre_crop_size = self.pre_crop_size_2D if self.dim == 2 else self.pre_crop_size_3D
@@ -98,7 +94,7 @@ class configs(DefaultConfigs):
 
 
         #########################
-        #      Architecture      #
+        #      Architecture     #
         #########################
 
         self.start_filts = 48 if self.dim == 2 else 18
@@ -114,19 +110,18 @@ class configs(DefaultConfigs):
         #  Schedule / Selection #
         #########################
 
-        self.num_epochs = 10 #100
-        self.num_train_batches = 200 if self.dim == 2 else 200
-        # GG
+        self.num_epochs = 10
         self.batch_size = 2
+        self.num_train_batches = self.num_samples // self.batch_size
 
         self.do_validation = True
         # decide whether to validate on entire patient volumes (like testing) or sampled patches (like training)
-        # the former is morge accurate, while the latter is faster (depending on volume size)
+        # the former is more accurate, while the latter is faster (depending on volume size)
         # GG
         # self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
         self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
         # GG TODO confusing name .num_val_batches ... validation_size
-        self.num_val_batches = 50
+        self.num_val_batches = 50 
 
         #########################
         #   Testing / Plotting  #
@@ -154,8 +149,7 @@ class configs(DefaultConfigs):
 
         self.plot_prediction_histograms = True
         self.plot_stat_curves = False
-        # GG TODO or Not
-        # ??? self.plot_dir = os.path.join( self.exp_dir
+       
         #########################
         #   Data Augmentation   #
         #########################
@@ -188,45 +182,19 @@ class configs(DefaultConfigs):
         #   Add model specifics #
         #########################
 
-        {'detection_unet': self.add_det_unet_configs,
-         'mrcnn': self.add_mrcnn_configs,
+        { 'mrcnn': self.add_mrcnn_configs,
          'ufrcnn': self.add_mrcnn_configs,
-         'ufrcnn_surrounding': self.add_mrcnn_configs,
          'retina_net': self.add_mrcnn_configs,
          'retina_unet': self.add_mrcnn_configs,
-         'prob_detector': self.add_mrcnn_configs,
         }[self.model]()
 
-
-    def add_det_unet_configs(self):
-
-        self.learning_rate = [1e-4] * self.num_epochs
-
-        # aggregation from pixel perdiction to object scores (connected component). One of ['max', 'median']
-        self.aggregation_operation = 'max'
-
-        # max number of roi candidates to identify per image (slice in 2D, volume in 3D)
-        self.n_roi_candidates = 3 if self.dim == 2 else 8
-
-        # loss mode: either weighted cross entropy ('wce'), batch-wise dice loss ('dice), or the sum of both ('dice_wce')
-        self.seg_loss_mode = 'dice_wce'
-
-        # if <1, false positive predictions in foreground are penalized less.
-        self.fp_dice_weight = 1 if self.dim == 2 else 1
-
-        self.wce_weights = [1, 1, 1]
-        self.detection_min_confidence = self.min_det_thresh
-
-        # if 'True', loss distinguishes all classes, else only foreground vs. background (class agnostic).
-        self.class_specific_seg_flag = True
-        self.num_seg_classes = 3 if self.class_specific_seg_flag else 2
-        self.head_classes = self.num_seg_classes
 
     def add_mrcnn_configs(self):
 
         # learning rate is a list with one entry per epoch.
+        ## SD - might need adjust learning rate to smaller value, https://github.com/facebookresearch/maskrcnn-benchmark/issues/658
         self.learning_rate = [1e-4] * self.num_epochs
-
+ 
         # disable mask head loss. (e.g. if no pixelwise annotations available)
         self.frcnn_mode = False
 
@@ -240,7 +208,7 @@ class configs(DefaultConfigs):
         self.n_plot_rpn_props = 5 if self.dim == 2 else 30
 
         # number of classes for head networks: n_foreground_classes + 1 (background)
-        self.head_classes = 3
+        self.head_classes = self.num_classes  ## SD - important to update this!!
 
         # seg_classes hier refers to the first stage classifier (RPN)
         self.num_seg_classes = 2  # foreground vs. background
@@ -322,28 +290,6 @@ class configs(DefaultConfigs):
             self.num_seg_classes = 3 if self.class_specific_seg_flag else 2
             self.frcnn_mode = True
 
-        if self.model == 'retina_net' or self.model == 'retina_unet' or self.model == 'prob_detector':
-            # implement extra anchor-scales according to retina-net publication.
-            self.rpn_anchor_scales['xy'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
-                                            self.rpn_anchor_scales['xy']]
-            self.rpn_anchor_scales['z'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
-                                           self.rpn_anchor_scales['z']]
-            self.n_anchors_per_pos = len(self.rpn_anchor_ratios) * 3
-
-            self.n_rpn_features = 256 if self.dim == 2 else 64
-
-            # pre-selection of detections for NMS-speedup. per entire batch.
-            self.pre_nms_limit = 10000 if self.dim == 2 else 50000
-
-            # anchor matching iou is lower than in Mask R-CNN according to https://arxiv.org/abs/1708.02002
-            self.anchor_matching_iou = 0.5
-
-            # if 'True', seg loss distinguishes all classes, else only foreground vs. background (class agnostic).
-            self.num_seg_classes = 3 if self.class_specific_seg_flag else 2
-
-            if self.model == 'retina_unet':
-                self.operate_stride1 = True
-                self.class_specific_seg_flag = True
         # GG
         # Debug
         # 

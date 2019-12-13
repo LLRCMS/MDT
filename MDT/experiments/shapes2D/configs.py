@@ -23,6 +23,17 @@ from default_configs import DefaultConfigs
 class configs(DefaultConfigs):
 
     def __init__(self, server_env=None):
+    """Config parameters to adjust by user:	
+
+	self.dim
+	self.model
+	self.num_samples
+	self.num_classes
+	self.pre_crop_size_2D
+	self.patch_size_2D       
+	self.num_epochs
+	self.batch_size
+    """
 
         #########################
         #    Preprocessing      #
@@ -66,8 +77,10 @@ class configs(DefaultConfigs):
         #########################
         # set number of samples for dataset, shapes.py will use this value to generate dataset
         self.num_samples = 1000 
+        
+	# set number of classes depending on dataset, N classes (i.e. square, circle, triangle) + 1 for background
+        # this will define the self.head_classes in add_mrcnn_configs()
         self.num_classes = 4
-
 
         # select modalities from preprocessed data
         self.n_channels = 3 
@@ -208,7 +221,7 @@ class configs(DefaultConfigs):
         self.n_plot_rpn_props = 5 if self.dim == 2 else 30
 
         # number of classes for head networks: n_foreground_classes + 1 (background)
-        self.head_classes = self.num_classes  ## SD - important to update this!!
+        self.head_classes = self.num_classes  ## SD - important to update this in Data Loader section!
 
         # seg_classes hier refers to the first stage classifier (RPN)
         self.num_seg_classes = 2  # foreground vs. background

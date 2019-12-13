@@ -26,16 +26,6 @@ def get_train_generators(cf, logger):
     """
     all_data = load_dataset(cf, logger)
 
-    # all_pids_list = np.unique([v['pid'] for (k, v) in all_data.items()])
-    #
-    # train_pids = all_pids_list[:cf.n_train_data]
-    # val_pids = all_pids_list[1000:1500]
-    #
-    # train_data = {k: v for (k, v) in all_data.items() if any(p == v['pid'] for p in train_pids)}
-    # val_data = {k: v for (k, v) in all_data.items() if any(p == v['pid'] for p in val_pids)}
-    #
-    # logger.info("data set loaded with: {} train / {} val patients".format(len(train_pids), len(val_pids)))
-
     batch_gen = {}
 
     batch_gen['train'] = create_data_gen_pipeline(
@@ -101,14 +91,9 @@ def load_dataset(cf, logger, subset_ixs=None):
 
     # SD - modified based on shapes dataset, need to fix
     labelIDs = []
-    #shapes = []
     for ix, pid in enumerate(pids):
-        #image = dataset.load_image(pid)
         _, class_id = dataset.load_mask(pid)
-        #shape_info = dataset.image_info[ix]['shapes']
-        #data[pid] = = {'data': img, 'seg': seg, 'pid': pid, 'class_target': list(class_id)}
         labelIDs.append( list(class_id) )
-        #shapes.append( shape_info )
 
     data['dataset'] = dataset
     data['pids'] = pids # TODO: This is unused. Modify for use or remove.

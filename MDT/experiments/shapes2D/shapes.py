@@ -236,8 +236,6 @@ class ShapesDataset(Dataset):
         for i in range(count-2, -1, -1):
             mask[:, :, i] = mask[:, :, i] * occlusion
             occlusion = np.logical_and(occlusion, np.logical_not(mask[:, :, i]))
-        # Map class names to class IDs.
-        # class_ids = np.array([self.class_names.index(s[0]) for s in shapes])
 
          # SD - change mask type from bool to uint8 and return class_ids as names
         class_ids = np.array([s[0] for s in shapes])
@@ -306,11 +304,8 @@ class ShapesDataset(Dataset):
     def map_classnames_to_classids(self, classnames):
         """Maps class names to their numeric id as defined in self.classes and
         load_shapes(). It returns classids as a numpy array.
-
-        Note: Not sure if it model will function the same is returned as a list
         """
         classids = np.array([ self.classes.index(c) for c in classnames], dtype=np.int32)
-        #classids = [self.classes.index(c) for c in classnames] #This returns a list
         return classids
 
 ############################################################
@@ -550,29 +545,4 @@ def non_max_suppression(boxes, scores, threshold):
 
 
 
-if __name__ == "__main__":
-    sys.path.append(os.path.dirname(os.path.realpath('__file__')))
-    root_dir = os.path.dirname(os.path.realpath('__file__'))
-    print(root_dir)
-
-    exp_name = 'shapes'
-    image_height = image_width = 320
-    train_dir = os.path.join(root_dir, exp_name, 'train')
-    val_dir = os.path.join(root_dir, exp_name, 'val')
-    print(train_dir)
-    print(val_dir)
-
-    # Training dataset
-    train_dataset = ShapesDataset(num_samples=300, height=image_height, width=image_width)
-    train_dataset.load_shapes()
-    train_dataset.prepare()
-
-    all_data = load_dataset(cf, logger, train_dataset)
-    all_pids_list = np.unique([v['pid'] for (k, v) in all_data.items()])
-
-    train_pids = all_pids_list[:200] # hardcoded these values
-    val_pids = all_pids_list[200:300]
-
-    train_data = {k: v for (k, v) in all_data.items() if any(p == v['pid'] for p in train_pids)}
-    val_data = {k: v for (k, v) in all_data.items() if any(p == v['pid'] for p in val_pids)}
 

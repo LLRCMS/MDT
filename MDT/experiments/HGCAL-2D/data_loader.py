@@ -282,6 +282,7 @@ class BatchGenerator(SlimDataLoaderBase):
         # Update values which control the shuffling
         self.nbrOfBatchProcessed += self.batch_size
         if( self.nbrOfBatchProcessed >= self.nbrOfBatch): self.nbrOfBatchProcessed = 0
-
+        
+        print(">>> sample pid & roi labels ", batch_pid[0], batch_gt_classes[0])
         return { 'data': batch_images, 'pid': batch_pid, 'roi_masks': batch_gt_masks, 
                  'roi_labels': batch_gt_classes, 'bb_target': batch_gt_bboxes }

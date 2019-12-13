@@ -15,6 +15,7 @@ from batchgenerators.transforms.crop_and_pad_transforms import CenterCropTransfo
 # from batchgenerators.transforms.utility_transforms import ConvertSegToBoundingBoxCoordinates
 from batchgenerators.transforms.utility_transforms import NullOperation
 
+from shapes import ShapesDataset, extract_bboxes
 
 def get_train_generators(cf, logger):
     """
@@ -75,8 +76,9 @@ def load_dataset(cf, logger, subset_ixs=None):
         exit()
 
     # Create Shapes Dataset
-    from shapes import ShapesDataset, extract_bboxes
-    dataset = ShapesDataset(num_samples=1000, height=320, width=320)
+    #from shapes import ShapesDataset, extract_bboxes, non_max_suppression
+    dataset = ShapesDataset(num_samples=cf.num_samples, height= cf.pre_crop_size_2D[0], width=cf.pre_crop_size_2D[1])
+
     dataset.load_shapes()
     dataset.prepare()
 
@@ -99,19 +101,18 @@ def load_dataset(cf, logger, subset_ixs=None):
 
     # SD - modified based on shapes dataset, need to fix
     labelIDs = []
-    shapes = []
+    #shapes = []
     for ix, pid in enumerate(pids):
         #image = dataset.load_image(pid)
         _, class_id = dataset.load_mask(pid)
-        shape_info = dataset.image_info[ix]['shapes']
+        #shape_info = dataset.image_info[ix]['shapes']
         #data[pid] = = {'data': img, 'seg': seg, 'pid': pid, 'class_target': list(class_id)}
         labelIDs.append( list(class_id) )
-        shapes.append( shape_info )
+        #shapes.append( shape_info )
 
     data['dataset'] = dataset
     data['pids'] = pids # TODO: This is unused. Modify for use or remove.
     data['labels'] = labelIDs
-    data['shapes'] = shapes  # TODO: This is unused. Remove later.
     data['xSize'] = dataset.width
     data['ySize'] = dataset.height
 
@@ -215,7 +216,6 @@ class BatchGenerator(SlimDataLoaderBase):
         dataset = self._data['dataset']
         pids = self._data['pids'] # TODO: This is unused. Modify for use or remove.
         labelsIDs = self._data['labels']
-        shapes = self._data['shapes'] # TODO: This is unused. Remove later.
 
         if self.cf.debug_generate_train_batch :
             print("#images, #labels", len(pids), len(labelIDs))
@@ -245,7 +245,9 @@ class BatchGenerator(SlimDataLoaderBase):
             mask, class_label = dataset.load_mask(evIdx) # orig mask shape is [H,W,nObjs]
             class_id = dataset.map_classnames_to_classids(class_label) # this is a numpy array
             bbox = extract_bboxes(mask) # orig shape is [nObjs,(y1,x1,y2,x2)] ~ [nObjs,4]
-
+             
+            # Expands dims of class_id
+            class_id = np.expand_dims(class_id, axis=-1) 
 
             # Images
             # NOTE: take care to transpose correctly!
@@ -259,7 +261,7 @@ class BatchGenerator(SlimDataLoaderBase):
             # BBoxes and Masks allocation
             gt_bboxes = np.zeros( (nObjs, 4), dtype=np.float )
             gt_masks  = np.zeros( (nObjs, C, xSize, ySize) )
-
+           
             for k in range(nObjs):
                 # BBoxes
                 y1, x1, y2, x2 = bbox[k,:]
@@ -268,7 +270,6 @@ class BatchGenerator(SlimDataLoaderBase):
                 # Masks
                 # NOTE: take care to transpose and expand dimension correctly!
                 mask_k = np.expand_dims(mask[:,:,k], axis=-1) # shape is now [H,W,1]
-                # print(mask_k.shape)
                 gt_masks[k,0,:,:] =  np.transpose(mask_k, (2,1,0)) # shape is now [nObjs,C,W,H]
 
             # Batch update
@@ -280,7 +281,6 @@ class BatchGenerator(SlimDataLoaderBase):
         # Update values which control the shuffling
         self.nbrOfBatchProcessed += self.batch_size
         if( self.nbrOfBatchProcessed >= self.nbrOfBatch): self.nbrOfBatchProcessed = 0
-
         return { 'data': batch_images, 'pid': batch_pid, 'roi_masks': batch_gt_masks,
                  'roi_labels': batch_gt_classes, 'bb_target': batch_gt_bboxes }
 

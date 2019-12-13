@@ -40,7 +40,6 @@ class configs(DefaultConfigs):
 
         # one out of ['mrcnn', 'retina_net', 'retina_unet', 'detection_unet', 'ufrcnn', 'detection_unet'].
         self.model = 'mrcnn'
-        
 
         DefaultConfigs.__init__(self, self.model, server_env, self.dim)
 
@@ -65,15 +64,18 @@ class configs(DefaultConfigs):
         #########################
         #      Data Loader      #
         #########################
+        # set number of samples for dataset, shapes.py will use this value to generate dataset
+        self.num_samples = 1000 
+        self.num_classes = 4
+
 
         # select modalities from preprocessed data
-        #self.channels = [0]
-        self.n_channels = 3 #len(self.channels)
+        self.n_channels = 3 
 
         # patch_size to be used for training. pre_crop_size is the patch_size before data augmentation.
         # GG set the cropped size to run successfully the program
-        self.pre_crop_size_2D = [256, 256]
-        self.patch_size_2D = [256, 256]
+        self.pre_crop_size_2D = [320, 320] # [256, 256]
+        self.patch_size_2D = [320, 320 ]# [256, 256]
 
         self.patch_size = self.patch_size_2D if self.dim == 2 else self.patch_size_3D
         self.pre_crop_size = self.pre_crop_size_2D if self.dim == 2 else self.pre_crop_size_3D
@@ -92,7 +94,7 @@ class configs(DefaultConfigs):
 
 
         #########################
-        #      Architecture      #
+        #      Architecture     #
         #########################
 
         self.start_filts = 48 if self.dim == 2 else 18
@@ -109,11 +111,8 @@ class configs(DefaultConfigs):
         #########################
 
         self.num_epochs = 10
-        # Note: num_train_batches not used
-        self.num_train_batches = 200 if self.dim == 2 else 200
-        
-        # GG
         self.batch_size = 2
+        self.num_train_batches = self.num_samples // self.batch_size
 
         self.do_validation = True
         # decide whether to validate on entire patient volumes (like testing) or sampled patches (like training)
@@ -122,7 +121,7 @@ class configs(DefaultConfigs):
         # self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
         self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
         # GG TODO confusing name .num_val_batches ... validation_size
-        self.num_val_batches = 50 # Note: num_val_batchse not used
+        self.num_val_batches = 50 
 
         #########################
         #   Testing / Plotting  #
@@ -193,8 +192,9 @@ class configs(DefaultConfigs):
     def add_mrcnn_configs(self):
 
         # learning rate is a list with one entry per epoch.
+        ## SD - might need adjust learning rate to smaller value, https://github.com/facebookresearch/maskrcnn-benchmark/issues/658
         self.learning_rate = [1e-4] * self.num_epochs
-
+ 
         # disable mask head loss. (e.g. if no pixelwise annotations available)
         self.frcnn_mode = False
 
@@ -208,7 +208,7 @@ class configs(DefaultConfigs):
         self.n_plot_rpn_props = 5 if self.dim == 2 else 30
 
         # number of classes for head networks: n_foreground_classes + 1 (background)
-        self.head_classes = 3
+        self.head_classes = self.num_classes  ## SD - important to update this!!
 
         # seg_classes hier refers to the first stage classifier (RPN)
         self.num_seg_classes = 2  # foreground vs. background

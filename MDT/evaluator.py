@@ -77,6 +77,11 @@ class Evaluator():
             batch_elements_list = [item[0] for item in results_list]
             pid_list = [item[1] for item in results_list]
 
+        # GG
+        # predicted boxes
+        # print("batch_elements_list",  batch_elements_list )
+        # print("pid_list",  pid_list )
+
         for match_iou in self.cf.ap_match_ious:
             self.logger.info('evaluating with match_iou: {}'.format(match_iou))
             for cl in list(self.cf.class_dict.keys()):
@@ -187,6 +192,8 @@ class Evaluator():
         self.test_df['det_type'] = df_list_type
         self.test_df['fold'] = self.cf.fold
         self.test_df['match_iou'] = df_list_match_iou
+        # GG
+        # print( "self.test_df['pred_score']",self.test_df['pred_score'])
         if monitor_metrics is not None:
             return self.return_metrics(monitor_metrics)
 

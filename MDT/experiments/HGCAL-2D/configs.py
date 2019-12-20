@@ -62,7 +62,8 @@ class configs(DefaultConfigs):
         # GG Not used
         self.input_test_name = 'eval-layer.12-20-100.obj'        
         self.pp_test_data_path = os.path.join(self.root_dir, self.input_test_name)
-
+        # GG Confusing
+        self.pp_test_name = "dummy"
         # settings for deployment in cloud.
         if server_env:
             print("Error: mode not available")
@@ -114,9 +115,12 @@ class configs(DefaultConfigs):
         #  Schedule / Selection #
         #########################
 
-        self.num_epochs = 10 #100
-        self.num_train_batches = 200 if self.dim == 2 else 200
+        self.num_epochs = 100
+        self.num_train_batches = 20 if self.dim == 2 else 200
+        self.batch_size = 20 if self.dim == 2 else 8
         # GG
+        self.num_epochs = 40
+        self.num_train_batches = 10000
         self.batch_size = 2
 
         self.do_validation = True
@@ -126,7 +130,7 @@ class configs(DefaultConfigs):
         # self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
         self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
         # GG TODO confusing name .num_val_batches ... validation_size
-        self.num_val_batches = 50
+        self.num_val_batches = 500
 
         #########################
         #   Testing / Plotting  #

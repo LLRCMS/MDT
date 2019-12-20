@@ -101,6 +101,8 @@ def prep_exp(dataset_path, exp_path, server_env, use_stored_settings=True, is_tr
         cf_file = import_module('cf', os.path.join(exp_path, 'configs.py'))
         cf = cf_file.configs(server_env)
         if cf.hold_out_test_set:
+            print("GG cf_file",  cf_file )
+            print("GG cf", cf)
             cf.pp_data_path = cf.pp_test_data_path
             cf.pp_name = cf.pp_test_name
         tmp_model_path = os.path.join(cf.source_dir, 'models', 'tmp_model.py')

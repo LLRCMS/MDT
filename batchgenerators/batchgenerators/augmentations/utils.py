@@ -488,7 +488,7 @@ def general_cc_var_num_channels(img, diff_order=0, mink_norm=1, sigma=1, mask_im
 
 # GG 
 def null_operation(data_dict):
-    return data_dict
+  return data_dict
 
 def convert_seg_to_bounding_box_coordinates(data_dict, dim, get_rois_from_seg_flag=False, class_specific_seg_flag=False):
 

@@ -28,7 +28,7 @@ class configs(DefaultConfigs):
         #    Preprocessing      #
         #########################
 
-        self.root_dir = '../dataset' #'/data_CMS_upgrade/grasseau/MDT/toy_exp'
+        self.root_dir = '/data_CMS_upgrade/grasseau/MDT/toy_exp'
 
         #########################
         #         I/O           #

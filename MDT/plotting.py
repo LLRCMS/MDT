@@ -54,6 +54,200 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
     print ("pids.size ", pids.size)
 
     # GG  
+    print("  segs.shape, data.shape, pids.shape", segs.shape, data.shape, pids.shape )
+    if segs.shape[1] != 1:
+      print("Plot Warning: multiple GT occurences")
+      segs = segs[:, 0, :,:,:]
+      pids = pids[:, 0, :]
+      # Suppress one dimmension
+      # masks = []
+      # for b in range(len(segs)):
+      #   masks.append( segs[b][0, :, :, :] ) 
+      #segs =  masks
+      print("segs.shape ", segs.shape )
+
+
+    # for 3D, repeat pid over batch elements.
+    if len(set(pids)) == 1:
+        pids = [pids] * data.shape[0]
+
+    seg_preds = results_dict['seg_preds']
+    roi_results = deepcopy(results_dict['boxes'])
+    # GG print("GG roi_results", roi_results)
+    # Randomly sampled one patient of batch and project data into 2D slices for plotting.
+    if cf.dim == 3:
+      print("Error: not implemented")
+      exit()
+    
+    try:
+        # all dimensions except for the 'channel-dimension' are required to match
+        for i in [0, 2, 3]:
+            assert data.shape[i] == segs.shape[i] == seg_preds.shape[i]
+    except:
+        raise Warning('Shapes of arrays to plot not in agreement!'
+                      'Shapes {} vs. {} vs {}'.format(data.shape, segs.shape, seg_preds.shape))
+
+
+    # show_arrays = np.concatenate([data, segs, seg_preds, data[:, 0][:, None]], axis=1).astype(float)
+    # print( "show_arrays.shape", show_arrays.shape )
+    # GG in inches (width, height)
+    approx_figshape = (4 * data.shape[0], 4 * 4)
+    fig = plt.figure(figsize=approx_figshape)
+    gs = gridspec.GridSpec(4,data.shape[0])
+    gs.update(wspace=0.1, hspace=0.1)
+    for b in range(data.shape[0]):
+        for m in range(4):
+
+            ax = plt.subplot(gs[m, b])
+            ax.axis('off')
+
+            # GG
+            """
+            if m < data.shape[1] or m == show_arrays.shape[1] - 1:
+                cmap = 'gray'
+                vmin = None
+                vmax = None
+            else:
+                cmap = None
+                vmin = 0
+                vmax = cf.num_seg_classes - 1
+            """
+            cmap = 'gray'
+            vmin = None
+            vmax = None
+
+            if m == 0:
+                print("GG b, pids", b, pids, pids[b])
+                # plt.title('{}'.format(pids[b][:10]), fontsize=20)
+                plt.title('{}'.format(pids[b]), fontsize=20)
+            # GG
+            arr = np.log( data[b, 0]+1.0 )
+            plt.imshow(arr, cmap=cmap, vmin=vmin, vmax=vmax)
+
+            # GG if m >= (data.shape[1]):
+            for box in roi_results[b]:
+              """
+                    if box['box_type'] != 'patient_tn_box': # don't plot true negative dummy boxes.
+                        coords = box['box_coords']
+                        if box['box_type'] == 'det':
+                            # dont plot background preds or low confidence boxes.
+                            if box['box_pred_class_id'] > 0 and box['box_score'] > 0.1:
+                                plot_text = True
+                                score = np.max(box['box_score'])
+                                score_text = 'sc{}|{:.0f}'.format(box['box_pred_class_id'], score*100)
+                                # if prob detection: plot only boxes from correct sampling instance.
+                                if 'sample_id' in box.keys() and int(box['sample_id']) != m - data.shape[1] - 2:
+                                        continue
+                                # if prob detection: plot reconstructed boxes only in corresponding line.
+                                if not 'sample_id' in box.keys() and  m != data.shape[1] + 1:
+                                    continue
+
+                                score_font_size = 7
+                                text_color = 'w'
+                                text_x = coords[1] + 10*(box['box_pred_class_id'] -1) #avoid overlap of scores in plot.
+                                text_y = coords[2] + 5
+                            else:
+                                continue
+              """
+              # GG elif box['box_type'] == 'gt':
+              coords = box['box_coords']
+              drawBoxes = False
+              # self.box_color_palette = {'det': 'b', 'gt': 'r', 'neg_class': 'purple',
+              # 'prop': 'w', 'pos_class': 'g', 'pos_anchor': 'c', 'neg_anchor': 'gray'}
+
+              if m == 1:            
+                if box['box_type'] == 'gt':
+                    drawBoxes = True
+                    plot_text = True
+                    score_text = 's'+ str( int(box['box_label']) )
+                    score_font_size = 7
+                    text_color = 'r'
+                    text_x = coords[1]
+                    text_y = coords[0] - 1
+                    color =  cf.box_color_palette['gt']
+              elif m == 2:
+                if box['box_type'] == 'det':
+                  if box['box_pred_class_id'] > 0 and box['box_score'] > 0.1:
+                    drawBoxes = True
+                    plot_text = True
+                    score = (box['box_score'])
+                    score_text = 'sc{}|{:.0f}'.format(box['box_pred_class_id'], score*100)
+                    """
+                    try:
+                     score_text = 'p'+ str( int( box['box_score']) )
+                    except KeyError:
+                     score_text = 'p'
+                     """
+                    score_font_size = 7
+                    text_color = 'r'
+                    text_x = coords[1]
+                    text_y = coords[0] - 1
+                    color =  cf.box_color_palette['det']
+              elif m==3 :
+                 if (box['box_type'] != 'det') and (box['box_type'] != 'gt'):
+                    drawBoxes = True
+                    plot_text = True
+                    plot_text = False
+                    # score = (box['box_score'])
+                    # score_text = 'sc{}|{:.0f}'.format(box['box_pred_class_id'], score*100)
+                    """
+                    try:
+                     score_text = 'p'+ str( int( box['box_score']) )
+                    except KeyError:
+                     score_text = 'p'
+                     """
+                    score_font_size = 7
+                    text_color = 'r'
+                    text_x = coords[1]
+                    text_y = coords[0] - 1
+                    color =  cf.box_color_palette[ box['box_type']]
+
+              if drawBoxes:
+                plt.plot([coords[1], coords[3]], [coords[0], coords[0]], color=color, linewidth=1, alpha=1) # up
+                plt.plot([coords[1], coords[3]], [coords[2], coords[2]], color=color, linewidth=1, alpha=1) # down
+                plt.plot([coords[1], coords[1]], [coords[0], coords[2]], color=color, linewidth=1, alpha=1) # left
+                plt.plot([coords[3], coords[3]], [coords[0], coords[2]], color=color, linewidth=1, alpha=1) # right
+                if plot_text:
+                            plt.text(text_x, text_y, score_text, fontsize=score_font_size, color=text_color)
+
+    try:
+        plt.savefig(outfile)
+    except:
+        raise Warning('failed to save plot.')
+    plt.close(fig)
+
+
+def plot_batch_prediction_old(batch, results_dict, cf, outfile= None):
+    """
+    plot the input images, ground truth annotations, and output predictions of a batch. If 3D batch, plots a 2D projection
+    of one randomly sampled element (patient) in the batch. Since plotting all slices of patient volume blows up costs of
+    time and space, only a section containing a randomly sampled ground truth annotation is plotted.
+    :param batch: dict with keys: 'data' (input image), 'seg' (pixelwise annotations), 'pid'
+    :param results_dict: list over batch element. Each element is a list of boxes (prediction and ground truth),
+    where every box is a dictionary containing box_coords, box_score and box_type.
+    """
+    if outfile is None:
+        outfile = os.path.join(cf.plot_dir, 'pred_example_{}.png'.format(cf.fold))
+
+    data = batch['data']
+    # GG segs = batch['seg']
+    segs_ = batch['roi_masks']
+    # print("len(seg), segs[0].shape", len(segs), segs[0].shape)
+    pids = batch['pid']
+    data = np.asarray( data ) 
+    segs = np.zeros( (len(segs_), 1, segs_[0].shape[1], segs_[0].shape[2], segs_[0].shape[3] ) ) 
+    for b in range(len( segs_ )):
+      segs[b,:,:,:] = segs_[b][0, :, :, :]
+
+    print("len, shape", len(segs), segs.shape)
+    # segs = np.asarray( segs )
+    # segs = np.reshape( segs, (len(segs), shape[0], shape[1], shape[2], shape[3] ) )
+    segs = np.concatenate (segs, axis=0)
+    print("len, shape", len(segs), segs.shape)
+    pids = np.asarray( pids )
+    print ("pids.size ", pids.size)
+
+    # GG  
     print("  segs.shape, data.shape ", segs.shape, data.shape, pids.shape )
     if segs.shape[1] != 1:
       print("Plot Warning: multiple GT occurences")
@@ -73,7 +267,7 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
 
     seg_preds = results_dict['seg_preds']
     roi_results = deepcopy(results_dict['boxes'])
-    print("GG roi_results", roi_results)
+    # GG print("GG roi_results", roi_results)
     # Randomly sampled one patient of batch and project data into 2D slices for plotting.
     if cf.dim == 3:
         patient_ix = np.random.choice(data.shape[0])

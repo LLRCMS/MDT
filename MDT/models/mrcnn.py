@@ -621,7 +621,7 @@ def detection_target_layer(batch_proposals, batch_mrcnn_class_scores, batch_gt_c
 
         # GG 
         if( target_class_ids.size()[-1] == 1):
-          target_class_ids = torch.squeeze(target_class_ids, -1)
+            target_class_ids = torch.squeeze(target_class_ids, -1)
  
         target_class_ids = torch.cat([target_class_ids, zeros], dim=0)
         zeros = torch.zeros(negative_count, cf.dim * 2).cuda()
@@ -1034,7 +1034,6 @@ class net(nn.Module):
         """
         # extract features.
         fpn_outs = self.fpn(img)
-
         rpn_feature_maps = [fpn_outs[i] for i in self.cf.pyramid_levels]
         self.mrcnn_feature_maps = rpn_feature_maps
 
@@ -1049,7 +1048,7 @@ class net(nn.Module):
         outputs = list(zip(*layer_outputs))
         outputs = [torch.cat(list(o), dim=1) for o in outputs]
         rpn_pred_logits, rpn_pred_probs, rpn_pred_deltas = outputs
-         
+
         # generate proposals: apply predicted deltas to anchors and filter by foreground scores from RPN classifier.
         proposal_count = self.cf.post_nms_rois_training if is_training else self.cf.post_nms_rois_inference
         batch_rpn_rois, batch_proposal_boxes = proposal_layer(rpn_pred_probs, rpn_pred_deltas, proposal_count, self.anchors, self.cf)

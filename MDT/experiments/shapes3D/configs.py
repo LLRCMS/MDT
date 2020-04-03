@@ -48,7 +48,7 @@ class configs(DefaultConfigs):
 
 
         # one out of [2, 3]. dimension the model operates in.
-        self.dim = 2
+        self.dim = 3
 
         # one out of ['mrcnn', 'retina_net', 'retina_unet', 'detection_unet', 'ufrcnn', 'detection_unet'].
         self.model = 'mrcnn'
@@ -90,6 +90,8 @@ class configs(DefaultConfigs):
         # GG set the cropped size to run successfully the program
         self.pre_crop_size_2D = [320, 320] # [256, 256]
         self.patch_size_2D = [320, 320 ]# [256, 256]
+        self.pre_crop_size_3D = [320, 320, 320] # [256, 256]
+        self.patch_size_3D = [320, 320, 320 ]# [256, 256]
 
         self.patch_size = self.patch_size_2D if self.dim == 2 else self.patch_size_3D
         self.pre_crop_size = self.pre_crop_size_2D if self.dim == 2 else self.pre_crop_size_3D

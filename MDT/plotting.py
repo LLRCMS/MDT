@@ -15,7 +15,8 @@
 # ==============================================================================
 
 import matplotlib
-matplotlib.use('Agg')
+# GG
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
@@ -37,8 +38,7 @@ def plot_batch_prediction(batch, results_dict, cf, outfile= None):
 
     data = batch['data']
     # GG segs = batch['seg']
-    segs_ = batch['roi_masks']
-    # print("len(seg), segs[0].shape", len(segs), segs[0].shape)
+    segs_ = batch['gt_masks']    # print("len(seg), segs[0].shape", len(segs), segs[0].shape)
     pids = batch['pid']
     data = np.asarray( data ) 
     segs = np.zeros( (len(segs_), 1, segs_[0].shape[1], segs_[0].shape[2], segs_[0].shape[3] ) ) 

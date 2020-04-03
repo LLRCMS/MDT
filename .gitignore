@@ -9,4 +9,12 @@ __pycache__/
 *.o
 *~
 
-
+# Application locat files
+MDT/venv/
+MDT/Inv
+MDT/Test/
+MDT/TMP/
+MDT/Run-C0-anchor-ratio/
+MDT/Dump
+MDT/Run-shape2D/
+MDT/Run-shape3D/

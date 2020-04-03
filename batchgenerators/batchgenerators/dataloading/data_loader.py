@@ -125,6 +125,9 @@ class SlimDataLoaderBase(object):
     def __next__(self):
         return self.generate_train_batch()
 
+    def getData(self):
+        return self._data
+
     @abstractmethod
     def generate_train_batch(self):
         '''override this

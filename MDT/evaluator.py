@@ -62,6 +62,8 @@ class Evaluator():
         df_list_type = []
         df_list_match_iou = []
 
+        print(">>> evaluate_predictions, classes:", self.cf.class_dict.keys())
+
         self.logger.info('evaluating in mode {}'.format(self.mode))
 
 
@@ -81,6 +83,10 @@ class Evaluator():
         # predicted boxes
         # print("batch_elements_list",  batch_elements_list )
         # print("pid_list",  pid_list )
+        sum_gt_bboxes = np.zeros( (self.cf.head_classes) )
+        sum_pred_bboxes = np.zeros( (self.cf.head_classes) )
+        sum_match_gt = np.zeros( (self.cf.head_classes) )
+        sum_no_match_gt = np.zeros( (self.cf.head_classes) )
 
         for match_iou in self.cf.ap_match_ious:
             self.logger.info('evaluating with match_iou: {}'.format(match_iou))
@@ -100,6 +106,12 @@ class Evaluator():
                         b_cand_scores = np.array([box['box_score'] for box in b_boxes_list if
                                                   (box['box_type'] == 'det' and
                                                    box['box_pred_class_id'] == cl)])
+                        # GG
+                        # print("  iou, cl, pid :",  match_iou, cl, pid )
+                        # print("  gt_boxes, pred_boxes, score_boxes:",   b_tar_boxes.shape[0], b_cand_boxes.shape[0], b_cand_scores.shape[0] )
+                        # GG 
+                        sum_gt_bboxes[cl] += b_tar_boxes.shape[0]
+                        sum_pred_bboxes[cl] += b_cand_boxes.shape[0]
 
                         # check if predictions and ground truth boxes exist and match them according to match_iou.
                         if not 0 in b_cand_boxes.shape and not 0 in b_tar_boxes.shape:
@@ -112,6 +124,11 @@ class Evaluator():
                                 [ii for ii in np.arange(b_tar_boxes.shape[0]) if ii not in match_gt_ixs])
                             unique, counts = np.unique(match_gt_ixs, return_counts=True)
 
+                            # GG
+                            sum_match_gt[cl] += unique.shape[0]
+                            sum_no_match_gt[cl] += non_match_gt_ixs.shape[0]
+                            # ??? if  b_cand_boxes.shape[0] != (match_gt_ixs.shape[0] + non_match_gt_ixs.shape[0]):
+                            #  print("    ??? b_cand_boxes, match_gt_ixs, unique, non_match_gt_ixs", b_cand_boxes.shape[0], match_gt_ixs.shape[0], unique.shape[0], non_match_gt_ixs.shape[0] )
                             # check for double assignments, i.e. two predictions having been assigned to the same gt.
                             # according to the COCO-metrics, only one prediction counts as true positive, the rest counts as
                             # false positive. This case is supposed to be avoided by the model itself by,
@@ -184,6 +201,15 @@ class Evaluator():
 
             df_list_match_iou += [match_iou] * (len(df_list_preds) - len(df_list_match_iou))
 
+        # GG
+        for cl in range(1, self.cf.head_classes ):
+
+            # GG
+            print ( "   class, # of gt_bboxes, # predict, # match, # no-match/", sum_gt_bboxes[cl], sum_pred_bboxes[cl], sum_match_gt[cl], sum_no_match_gt[cl] )
+            print ( "   class, # of gt_bboxes, predict/gt-box, match/gt-box, no-match/gt-box", cl,
+                    sum_gt_bboxes[cl], float(sum_pred_bboxes[cl])/sum_gt_bboxes[cl], 
+                    float(sum_match_gt[cl])/sum_gt_bboxes[cl], float(sum_no_match_gt[cl])/sum_gt_bboxes[cl])
+
         self.test_df = pd.DataFrame()
         self.test_df['pred_score'] = df_list_preds
         self.test_df['class_label'] = df_list_labels
@@ -193,7 +219,7 @@ class Evaluator():
         self.test_df['fold'] = self.cf.fold
         self.test_df['match_iou'] = df_list_match_iou
         # GG
-        # print( "self.test_df['pred_score']",self.test_df['pred_score'])
+        #print( " self.test_df['pred_score']",self.test_df['pred_score'])
         if monitor_metrics is not None:
             return self.return_metrics(monitor_metrics)
 

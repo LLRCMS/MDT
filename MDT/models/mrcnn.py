@@ -32,6 +32,38 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils
 
+# GG
+import pickle
+import matplotlib.pyplot as plt
+import utils.plotUtil as pltUtil
+
+# GG Dump
+df = None
+
+def plotTFPN( gt_labels, gt_bboxes, pred_labels, pred_scores, pred_bboxes, img, evID, score_cut=0.05):
+
+    fig, axs = plt.subplots(nrows=1, ncols=2)
+
+    # GT Image
+    pltUtil.plotImage(axs[0], img[:, :], title=str(evID), label="toto", withMasks= None)
+    pltUtil.plotBboxes( axs[0], gt_bboxes, boxTypes = gt_labels.reshape( gt_labels.shape[0]) )
+    # Prediction
+    idx = np.where(pred_scores >= score_cut)[0]
+
+    # GG Invalid ???
+    # print( idx )
+    # print( "idx.shape", idx.shape )
+    # print (" pred_bboxes[idx]", pred_bboxes[idx])
+    # print (pred_bboxes[idx,:])
+    # print (" pred_labels[idx]", pred_labels[idx])
+
+    pltUtil.plotImage(axs[1], np.log( img[ :, :] + 1.0), title=str(evID), label="toto", withMasks=None)
+    boxLabels = [ str(i) + '/' + str(pred_scores[i]) for i in idx ]
+
+    pltUtil.plotBboxes( axs[1], pred_bboxes[idx], boxTypes= pred_labels[idx], boxLabels=  boxLabels)
+    plt.tight_layout()
+    plt.show()
+        
 
 ############################################################
 # Networks on top of backbone
@@ -321,6 +353,7 @@ def proposal_layer(rpn_pred_probs, rpn_pred_deltas, proposal_count, anchors, cf)
     batch_normalized_boxes = []
     batch_out_proposals = []
 
+    all_anchors = anchors.cpu().data.numpy()
     # loop over batch dimension.
     for ix in range(batch_scores.shape[0]):
 
@@ -335,15 +368,28 @@ def proposal_layer(rpn_pred_probs, rpn_pred_deltas, proposal_count, anchors, cf)
         # and doing the rest on the smaller subset.
         pre_nms_limit = min(cf.pre_nms_limit, anchors.size()[0])
         scores, order = scores.sort(descending=True)
+        # print( pre_nms_limit, order.shape, scores.shape, deltas.shape, anchors.shape)
         order = order[:pre_nms_limit]
         scores = scores[:pre_nms_limit]
         deltas = deltas[order, :]
         anchors = anchors[order, :]
 
+
+        # GG Dump
+        if cf.dumpRPN:
+          pre_scores = scores.cpu().data.numpy()
+          pre_deltas = deltas.cpu().data.numpy()
+          pre_anchors = anchors.cpu().data.numpy()
+
         # apply deltas to anchors to get refined anchors and filter with non-maximum surpression.
         if batch_deltas.shape[-1] == 4:
             boxes = mutils.apply_box_deltas_2D(anchors, deltas)
             boxes = mutils.clip_boxes_2D(boxes, cf.window)
+
+            # GG Dump
+            if cf.dumpRPN:
+              pre_boxes = boxes.cpu().data.numpy()
+
             keep = nms_2D(torch.cat((boxes, scores.unsqueeze(1)), 1), cf.rpn_nms_threshold)
             norm = torch.from_numpy(cf.scale).float().cuda()
 
@@ -372,8 +418,21 @@ def proposal_layer(rpn_pred_probs, rpn_pred_deltas, proposal_count, anchors, cf)
         # add back batch dimension
         batch_normalized_boxes.append(normalized_boxes.unsqueeze(0))
 
+
+    
     batch_normalized_boxes = torch.cat(batch_normalized_boxes)
     batch_out_proposals = np.array(batch_out_proposals)
+    # GG Dump
+    # - all anchors, 
+    # - pre_anchors, before NMS 
+    # - pre_scores, 
+    # - pre_deltas, 
+    # - pre_boxes,  before NMS and delta applied on anchors
+    # - batch_out_proposals : after NMS & and top-k selection (array[bbox, score])
+    if cf.dumpRPN:
+      print( "detection_layer", all_anchors.shape, pre_anchors.shape, pre_scores.shape, pre_deltas.shape, pre_boxes.shape, batch_out_proposals.shape )
+      pickle.dump( (all_anchors, pre_anchors, pre_scores, pre_deltas,pre_boxes, batch_out_proposals), df)
+
     return batch_normalized_boxes, batch_out_proposals
 
 
@@ -409,19 +468,24 @@ def pyramid_roi_align(feature_maps, rois, pool_size, pyramid_levels, dim):
     # the fact that our coordinates are normalized here.
     # divide sqrt(h*w) by 1 instead image_area.
     roi_level = (4 + mutils.log2(torch.sqrt(h*w))).round().int().clamp(pyramid_levels[0], pyramid_levels[-1])
+    # GG print ("roi_level, pyramid levels", roi_level.shape, pyramid_levels[0], pyramid_levels[-1])
     # if Pyramid contains additional level P6, adapt the roi_level assignemnt accordingly.
     if len(pyramid_levels) == 5:
-        roi_level[h*w > 0.65] = 5
+        # GG roi_level[h*w > 0.65] = 5
+        roi_level[h*w > 0.65] = 4
+    # GG print("roi levels occured", np.unique( roi_level ))
 
     # Loop through levels and apply ROI pooling to each.
     pooled = []
     box_to_level = []
     for level_ix, level in enumerate(pyramid_levels):
         ix = roi_level == level
+        # print("level level_ix, level", level_ix, level )
         if not ix.any():
             continue
         ix = torch.nonzero(ix)[:, 0]
         level_boxes = boxes[ix, :]
+        # GG print("pyramid_align_roi level_ix, level, ix",level, level_ix, ix.shape)
         # re-assign rois to feature map of original batch element.
         ind = batch_ixs[ix].int()
 
@@ -673,12 +737,16 @@ def refine_detections(rois, probs, deltas, batch_ixs, cf):
         class_ids += [ii] * rois.shape[0]
     class_ids = torch.from_numpy(np.array(class_ids)).cuda()
 
+    # GG print("refine 1 roi, probs, deltas, batch_ixs", rois.shape, probs.shape, deltas.shape, batch_ixs.shape )
     rois = rois.repeat(fg_classes, 1)
     probs = probs.repeat(fg_classes, 1)
     deltas = deltas.repeat(fg_classes, 1, 1)
     batch_ixs = batch_ixs.repeat(fg_classes)
 
+    # GG print("refine 2 roi, probs, deltas, batch_ixs", rois.shape, probs.shape, deltas.shape, batch_ixs.shape )
+
     # get class-specific scores and  bounding box deltas
+    # print("refine", class_ids.size(), probs.shape )
     idx = torch.arange(class_ids.size()[0]).long().cuda()
     class_scores = probs[idx, class_ids]
     deltas_specific = deltas[idx, class_ids]
@@ -863,6 +931,7 @@ class net(nn.Module):
 
         # Image size must be dividable by 2 multiple times.
         h, w = self.cf.patch_size[:2]
+        # GG To do some thing with C0,P1
         if h / 2**5 != int(h / 2**5) or w / 2**5 != int(w / 2**5):
             raise Exception("Image size must be dividable by 2 at least 5 times "
                             "to avoid fractions when downscaling and upscaling."
@@ -900,10 +969,10 @@ class net(nn.Module):
                 'monitor_values': dict of values to be monitored.
         """
         img = batch['data']
-        gt_class_ids = batch['roi_labels']
-        gt_boxes = batch['bb_target']
+        gt_class_ids = batch['gt_labels'] 
+        gt_boxes = batch['gt_bboxes']
         axes = (0, 2, 3, 1) if self.cf.dim == 2 else (0, 2, 3, 4, 1)
-        gt_masks = [np.transpose(batch['roi_masks'][ii], axes=axes) for ii in range(len(batch['roi_masks']))]
+        gt_masks = [np.transpose(batch['gt_masks'][ii], axes=axes) for ii in range(len(batch['gt_masks']))]
 
 
         img = torch.from_numpy(img).float().cuda()
@@ -925,8 +994,8 @@ class net(nn.Module):
 
                 # add gt boxes to output list for monitoring.
                 for ix in range(len(gt_boxes[b])):
-                    box_results_list[b].append({'box_coords': batch['bb_target'][b][ix],
-                                                'box_label': batch['roi_labels'][b][ix], 'box_type': 'gt'})
+                    box_results_list[b].append({'box_coords': batch['gt_bboxes'][b][ix],
+                                                'box_label': batch['gt_labels'][b][ix], 'box_type': 'gt'})
 
                 # match gt boxes with anchors to generate targets for RPN losses.
                 rpn_match, rpn_target_deltas = mutils.gt_anchor_matching(self.cf, self.np_anchors, gt_boxes[b])
@@ -1018,8 +1087,25 @@ class net(nn.Module):
         """
         img = batch['data']
         img = torch.from_numpy(img).float().cuda()
-        _, _, _, detections, detection_masks = self.forward(img)
+        # GG
+        # _, _, _, detections, detection_masks = self.forward(img)
+        _, _, batch_proposal_boxes, detections, detection_masks = self.forward(img)
         results_dict = get_results(self.cf, img.shape, detections, detection_masks, return_masks=return_masks)
+
+        evID = batch['pid'][0]
+        img  = batch['data'][0,0,:,:]
+        gt_labels = batch['gt_labels'][0]
+        gt_bboxes = batch['gt_bboxes'][0]
+        gt_masks  = batch['gt_masks'][0]
+        pred_bboxes = batch_proposal_boxes[0, : , 0:4]
+        pred_scores  = batch_proposal_boxes[0, :, 4]
+        pred_labels = np.ones( batch_proposal_boxes.shape[1], dtype=np.int8 )
+        # GG print("pred_bboxes.shape",pred_bboxes.shape)
+        # GG print("pred_scores.shape",pred_scores.shape)
+
+        # GG Todo somthing
+        # plotTFPN( gt_labels, gt_bboxes, pred_labels, pred_scores, pred_bboxes, img, evID)
+
         return results_dict
 
 
@@ -1041,13 +1127,21 @@ class net(nn.Module):
         layer_outputs = []  # list of lists
         for p in rpn_feature_maps:
             layer_outputs.append(self.rpn(p))
-
+ 
         # concatenate layer outputs.
         # convert from list of lists of level outputs to list of lists of outputs across levels.
         # e.g. [[a1, b1, c1], [a2, b2, c2]] => [[a1, a2], [b1, b2], [c1, c2]]
         outputs = list(zip(*layer_outputs))
         outputs = [torch.cat(list(o), dim=1) for o in outputs]
         rpn_pred_logits, rpn_pred_probs, rpn_pred_deltas = outputs
+
+        # GG Dump
+        global df
+        if self.cf.dumpRPN:
+          df = open( 'rpn.obj', 'wb')
+          # Batch-size
+          pickle.dump( img.shape[0], df )
+          pickle.dump( img, df )
 
         # generate proposals: apply predicted deltas to anchors and filter by foreground scores from RPN classifier.
         proposal_count = self.cf.post_nms_rois_training if is_training else self.cf.post_nms_rois_inference
@@ -1056,6 +1150,7 @@ class net(nn.Module):
         # merge batch dimension of proposals while storing allocation info in coordinate dimension.
         batch_ixs = torch.from_numpy(np.repeat(np.arange(batch_rpn_rois.shape[0]), batch_rpn_rois.shape[1])).float().cuda()
         rpn_rois = batch_rpn_rois.view(-1, batch_rpn_rois.shape[2])
+        # GG print("prop count, chunk, rois, batch_ixs", proposal_count, self.cf.roi_chunk_size, rpn_rois.shape, batch_ixs.shape)
         self.rpn_rois_batch_info = torch.cat((rpn_rois, batch_ixs.unsqueeze(1)), dim=1)
 
         # this is the first of two forward passes in the second stage, where no activations are stored for backprop.
@@ -1069,6 +1164,7 @@ class net(nn.Module):
                 chunk_class_logits, chunk_bboxes = self.classifier(self.mrcnn_feature_maps, chunk)
                 class_logits_list.append(chunk_class_logits)
                 bboxes_list.append(chunk_bboxes)
+                # GG print("  chunk, logits, bboxes", chunk.shape, chunk_class_logits.shape, chunk_bboxes.shape )
         batch_mrcnn_class_logits = torch.cat(class_logits_list, 0)
         batch_mrcnn_bbox = torch.cat(bboxes_list, 0)
         self.batch_mrcnn_class_scores = F.softmax(batch_mrcnn_class_logits, dim=1)
@@ -1084,6 +1180,10 @@ class net(nn.Module):
         detection_boxes = detections[:, :self.cf.dim * 2 + 1] / scale
         with torch.no_grad():
             detection_masks = self.mask(self.mrcnn_feature_maps, detection_boxes)
+
+        # GG dump
+        if self.cf.dumpRPN:
+          df.close()
 
         return [rpn_pred_logits, rpn_pred_deltas, batch_proposal_boxes, detections, detection_masks]
 

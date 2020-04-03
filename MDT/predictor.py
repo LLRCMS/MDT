@@ -150,15 +150,21 @@ class Predictor:
                     batch = next(batch_gen['test'])
 
                     # store batch info in patient entry of results dict.
+                    # print("GG ??? debug batch", batch)
+                    # GG Bug : transform batch['pid'] to batch['pid'][0] (batch_size = 1)
+                    evID = batch['pid'][0]
                     if rank_ix == 0:
-                        dict_of_patient_results[batch['pid']] = {}
-                        dict_of_patient_results[batch['pid']]['results_list'] = []
-                        dict_of_patient_results[batch['pid']]['patient_bb_target'] = batch['patient_bb_target']
-                        dict_of_patient_results[batch['pid']]['patient_roi_labels'] = batch['patient_roi_labels']
+                        dict_of_patient_results[evID] = {}
+                        dict_of_patient_results[evID]['results_list'] = []
+                        # GG bug ???
+                        # dict_of_patient_results[evID]['patient_bb_target'] = batch['patient_bb_target']
+                        # dict_of_patient_results[evID]['patient_roi_labels'] = batch['patient_roi_labels']
+                        dict_of_patient_results[evID]['patient_bb_target'] = batch['bb_target']
+                        dict_of_patient_results[evID]['patient_roi_labels'] = batch['roi_labels']
 
                     # call prediction pipeline and store results in dict.
                     results_dict = self.predict_patient(batch)
-                    dict_of_patient_results[batch['pid']]['results_list'].append(results_dict['boxes'])
+                    dict_of_patient_results[evID]['results_list'].append(results_dict['boxes'])
 
 
         self.logger.info('finished predicting test set. starting post-processing of predictions.')
@@ -180,7 +186,11 @@ class Predictor:
             #                                       for batch_instance in range(len(tmp_ens_list[0]['boxes']))])
 
             # add 3D ground truth boxes for evaluation.
-            for b in range(p_dict['patient_bb_target'].shape[0]):
+            # print("GG ??? p_dict['patient_bb_target']", len(p_dict['patient_bb_target']), p_dict['patient_bb_target'] )
+            # GG batch-size = 1
+            # for b in range(p_dict['patient_bb_target'].shape[0]):
+            for b in range( len( p_dict['patient_bb_target'] )):
+
                 for t in range(len(p_dict['patient_bb_target'][b])):
                     results_dict['boxes'][b].append({'box_coords': p_dict['patient_bb_target'][b][t],
                                                      'box_label': p_dict['patient_roi_labels'][b][t],
@@ -291,8 +301,11 @@ class Predictor:
         """
         patch_crops = batch['patch_crop_coords'] if self.patched_patient else None
         results_list = [self.spatial_tiling_forward(batch, patch_crops)]
-        org_img_shape = batch['original_img_shape']
-
+        # GG bug ??
+        # org_img_shape = batch['original_img_shape']
+        # print("GG ??? data", batch['data'].shape, batch['data'])
+        org_img_shape = batch['data'].shape
+        # print("GG ???,cf.test_aug",  self.cf.test_aug)
         if self.mode == 'test' and self.cf.test_aug:
 
             if self.patched_patient:
@@ -357,6 +370,8 @@ class Predictor:
 
         # aggregate all boxes/seg_preds per batch element from data_aug predictions.
         results_dict = {}
+        # print("GG ???  org_img_shape.shape", org_img_shape, org_img_shape[0])
+
         results_dict['boxes'] = [[item for d in results_list for item in d['boxes'][batch_instance]]
                                  for batch_instance in range(org_img_shape[0])]
         results_dict['seg_preds'] = np.array([[item for d in results_list for item in d['seg_preds'][batch_instance]]

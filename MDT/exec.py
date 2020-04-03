@@ -25,6 +25,33 @@ import utils.exp_utils as utils
 from evaluator import Evaluator
 from predictor import Predictor
 from plotting import plot_batch_prediction
+# Memory survey
+import linecache
+import tracemalloc
+
+def display_top(snapshot, key_type='lineno', limit=10):
+    snapshot = snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, "<unknown>"),
+    ))
+    top_stats = snapshot.statistics(key_type)
+
+    print("Top %s lines" % limit)
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        print("#%s: %s:%s: %.1f KiB"
+              % (index, frame.filename, frame.lineno, stat.size / 1024))
+        line = linecache.getline(frame.filename, frame.lineno).strip()
+        if line:
+            print('    %s' % line)
+
+    other = top_stats[limit:]
+    if other:
+        size = sum(stat.size for stat in other)
+        print("%s other: %.1f KiB" % (len(other), size / 1024))
+    total = sum(stat.size for stat in top_stats)
+    print("Total allocated size: %.1f KiB" % (total / 1024))
+
 
 
 def train(logger):
@@ -34,6 +61,9 @@ def train(logger):
     """
     logger.info('performing training in {}D over fold {} on experiment {} with model {}'.format(
         cf.dim, cf.fold, cf.exp_dir, cf.model))
+
+    # Trace memory
+    tracemalloc.start()
 
     net = model.net(cf, logger).cuda()
     optimizer = torch.optim.Adam(net.parameters(), lr=cf.learning_rate[0], weight_decay=cf.weight_decay)
@@ -54,6 +84,9 @@ def train(logger):
     batch_gen = data_loader.get_train_generators(cf, logger)
 
     for epoch in range(starting_epoch, cf.num_epochs + 1):
+        print("Memory allocated:", torch.cuda.memory_allocated() / 1024**2)
+        snapshot = tracemalloc.take_snapshot()
+        display_top(snapshot)
 
         logger.info('starting training epoch {}'.format(epoch))
         for param_group in optimizer.param_groups:
@@ -79,8 +112,11 @@ def train(logger):
             train_results_list.append([results_dict['boxes'], batch['pid']])
             monitor_metrics['train']['monitor_values'][epoch].append(results_dict['monitor_values'])
 
+            # GG Memory leak
+            # del batch
+            train_time = time.time() - start_time
+
         _, monitor_metrics['train'] = train_evaluator.evaluate_predictions(train_results_list, monitor_metrics['train'])
-        train_time = time.time() - start_time
 
         logger.info('starting validation in mode {}.'.format(cf.val_mode))
         with torch.no_grad():
@@ -96,20 +132,22 @@ def train(logger):
                         results_dict = net.train_forward(batch, is_validation=True)
                     val_results_list.append([results_dict['boxes'], batch['pid']])
                     monitor_metrics['val']['monitor_values'][epoch].append(results_dict['monitor_values'])
+                    # GG Memory leak
+                    # del batch
 
                 _, monitor_metrics['val'] = val_evaluator.evaluate_predictions(val_results_list, monitor_metrics['val'])
                 model_selector.run_model_selection(net, optimizer, monitor_metrics, epoch)
 
             # update monitoring and prediction plots
-            TrainingPlot.update_and_save(monitor_metrics, epoch)
+            # GG Covid-19 TrainingPlot.update_and_save(monitor_metrics, epoch)
             epoch_time = time.time() - start_time
             logger.info('trained epoch {}: took {} sec. ({} train / {} val)'.format(
                 epoch, epoch_time, train_time, epoch_time-train_time))
             batch = next(batch_gen['val_sampling'])
             results_dict = net.train_forward(batch, is_validation=True)
             logger.info('plotting predictions from validation sampling.')
-            plot_batch_prediction(batch, results_dict, cf)
-
+            # GG Covid 19 plot_batch_prediction(batch, results_dict, cf)
+            
 
 def test(logger):
     """
@@ -182,9 +220,12 @@ if __name__ == '__main__':
 
         for fold in folds:
             cf.fold_dir = os.path.join(cf.exp_dir, 'fold_{}'.format(fold))
-            logger = utils.get_logger(cf.fold_dir)
-            cf.fold = fold
-            test(logger)
+            try:
+              logger = utils.get_logger(cf.fold_dir)
+              cf.fold = fold
+              test(logger)
+            except FileNotFoundError:
+              print("Stop at fold ", fold )
 
     # load raw predictions saved by predictor during testing, run aggregation algorithms and evaluation.
     elif args.mode == 'analysis':

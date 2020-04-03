@@ -23,24 +23,12 @@ from default_configs import DefaultConfigs
 class configs(DefaultConfigs):
 
     def __init__(self, server_env=None):
-        """
-        Config parameters to adjust by user:	
-        
-        self.dim
-        self.model
-        self.num_samples
-        self.num_classes
-        self.pre_crop_size_2D
-        self.patch_size_2D       
-        self.num_epochs
-        self.batch_size
-        """
 
         #########################
         #    Preprocessing      #
         #########################
 
-        self.root_dir = './dataset/' #'/data_CMS_upgrade/grasseau/HGCAL-2D/DataSet/'
+        self.root_dir = '/data_CMS_upgrade/grasseau/HGCAL-2D/DataSet/'
 
         #########################
         #         I/O           #
@@ -51,14 +39,21 @@ class configs(DefaultConfigs):
         self.dim = 2
 
         # one out of ['mrcnn', 'retina_net', 'retina_unet', 'detection_unet', 'ufrcnn', 'detection_unet'].
+        # self.model = 'ufrcnn'
         self.model = 'mrcnn'
+        
 
         DefaultConfigs.__init__(self, self.model, server_env, self.dim)
 
-        # int [0 < dataset_size]. select n samples from dataset for prototyping.
+        # int [0 < dataset_size]. select n patients from dataset for prototyping.
         self.select_prototype_subset = None
         self.hold_out_test_set = True
         
+        # choose one of the 3 toy experiments described in https://arxiv.org/pdf/1811.08661.pdf
+        # one of ['donuts_shape', 'donuts_pattern', 'circles_scale'].
+        # toy_mode = 'donuts_shape'
+
+
         # path to preprocessed data.
         self.input_train_name = 'train.layer.12-20-20000.obj'
 
@@ -67,40 +62,41 @@ class configs(DefaultConfigs):
         # GG Not used
         self.input_test_name = 'eval-layer.12-20-100.obj'        
         self.pp_test_data_path = os.path.join(self.root_dir, self.input_test_name)
-
+        # GG Confusing
+        self.pp_test_name = "dummy"
+        # Suffle default for training & validation (for detection force to False)
+        self.shuffle = True 
         # settings for deployment in cloud.
         if server_env:
             print("Error: mode not available")
             exit()
-
+        
         #########################
         #      Data Loader      #
         #########################
-        # set number of samples for dataset, shapes.py will use this value to generate dataset
-        self.num_samples = 1000 
-        
-	# set number of classes depending on dataset, N classes (i.e. square, circle, triangle) + 1 for background
-        # this will define the self.head_classes in add_mrcnn_configs()
-        self.num_classes = 4
 
         # select modalities from preprocessed data
-        self.n_channels = 3 
+        self.channels = [0]
+        self.n_channels = len(self.channels)
 
         # patch_size to be used for training. pre_crop_size is the patch_size before data augmentation.
         # GG set the cropped size to run successfully the program
-        self.pre_crop_size_2D = [320, 320] # [256, 256]
-        self.patch_size_2D = [320, 320 ]# [256, 256]
+        self.pre_crop_size_2D = [256, 256]
+        self.patch_size_2D = [256, 256]
 
         self.patch_size = self.patch_size_2D if self.dim == 2 else self.patch_size_3D
         self.pre_crop_size = self.pre_crop_size_2D if self.dim == 2 else self.pre_crop_size_3D
 
-        # ratio of free sampled batch elements before class balancing is triggered
+        # GG Not use - to remove
+        # ratio of free sampled batch elements before class 
+        # balancing is triggered
         # (>0 to include "empty"/background patches.)
-        self.batch_sample_slack = 0.2
+        # self.batch_sample_slack = 0.2
 
         # set 2D network to operate in 3D images.
         self.merge_2D_to_3D_preds = False
 
+        # GG - not true 3D model ? 
         # feed +/- n neighbouring slices into channel dimension. set to None for no context.
         self.n_3D_context = None
         if self.n_3D_context is not None and self.dim == 2:
@@ -108,10 +104,11 @@ class configs(DefaultConfigs):
 
 
         #########################
-        #      Architecture     #
+        #      Architecture      #
         #########################
-
+        # GG first feature map depth in the backbone
         self.start_filts = 48 if self.dim == 2 else 18
+        # GG output feature map depth in the backbone Pk
         self.end_filts = self.start_filts * 4 if self.dim == 2 else self.start_filts * 2
         self.res_architecture = 'resnet50' # 'resnet101' , 'resnet50'
         self.norm = None # one of None, 'instance_norm', 'batch_norm'
@@ -119,23 +116,37 @@ class configs(DefaultConfigs):
 
         # one of 'xavier_uniform', 'xavier_normal', or 'kaiming_normal', None (=default = 'kaiming_uniform')
         self.weight_init = None
-
+        # GG : Do C0
+        # self.operate_stride1 = True
         #########################
         #  Schedule / Selection #
         #########################
 
-        self.num_epochs = 10
+        self.num_epochs = 100
+        self.num_train_batches = 20 if self.dim == 2 else 200
+        self.batch_size = 20 if self.dim == 2 else 8
+        # GG
+        self.num_epochs = 120
+        self.num_train_batches = 10000
+        # self.num_train_batches = 1000
+
         self.batch_size = 2
-        self.num_train_batches = self.num_samples // self.batch_size
+        # For the test mode
+        # self.batch_size = 1
 
         self.do_validation = True
         # decide whether to validate on entire patient volumes (like testing) or sampled patches (like training)
-        # the former is more accurate, while the latter is faster (depending on volume size)
+        # the former is morge accurate, while the latter is faster (depending on volume size)
         # GG
         # self.val_mode = 'val_patient' # one of 'val_sampling' , 'val_patient'
         self.val_mode = 'val_sampling' # one of 'val_sampling' , 'val_patient'
         # GG TODO confusing name .num_val_batches ... validation_size
-        self.num_val_batches = 50 
+        self.num_val_batches = 500
+        # self.num_val_batches = 50
+        self.test_aug = False
+
+
+        self.num_test_batches = 16
 
         #########################
         #   Testing / Plotting  #
@@ -151,7 +162,7 @@ class configs(DefaultConfigs):
         self.report_score_level = ['patient', 'rois']  # choose list from 'patient', 'rois'
         self.class_dict = {1: 'benign', 2: 'malignant'}  # 0 is background.
         self.patient_class_of_interest = 2  # patient metrics are only plotted for one class.
-        self.ap_match_ious = [0.1]  # list of ious to be evaluated for ap-scoring.
+        self.ap_match_ious = [0.5]  # list of ious to be evaluated for ap-scoring.
 
         self.model_selection_criteria = ['benign_ap', 'malignant_ap'] # criteria to average over for saving epochs.
         self.min_det_thresh = 0.1  # minimum confidence value to select predictions for evaluation.
@@ -159,11 +170,13 @@ class configs(DefaultConfigs):
         # threshold for clustering predictions together (wcs = weighted cluster scoring).
         # needs to be >= the expected overlap of predictions coming from one model (typically NMS threshold).
         # if too high, preds of the same object are separate clusters.
+        # GG: Not used - to be removed
         self.wcs_iou = 1e-5
 
         self.plot_prediction_histograms = True
         self.plot_stat_curves = False
-       
+        # GG TODO or Not
+        # ??? self.plot_dir = os.path.join( self.exp_dir
         #########################
         #   Data Augmentation   #
         #########################
@@ -192,23 +205,73 @@ class configs(DefaultConfigs):
             self.da_kwargs['angle_z'] = (0., 2 * np.pi)
 
 
+        # 
+        # GG Debug
+        # 
+
+        # Use the same event
+        # One must deactivate shuffling and set a 
+        # non-negative value to cf.same_ev
+        self.same_ev = 3
+        self.same_ev = -1
+        #
+        # Shuffle data inputs
+        self.debug_deactivate_shuffling = False
+        self.debug_detection_target_layer = False
+        self.debug_compute_rpn_class = False
+        #
+        # Data Set: batch generator, ...
+        self.debug_generate_train_batch = True
+        self.debug_data_loader = True
+        #
+        # Dump
+        self.dumpRPN = False
+
         #########################
         #   Add model specifics #
         #########################
 
-        { 'mrcnn': self.add_mrcnn_configs,
+        {'detection_unet': self.add_det_unet_configs,
+         'mrcnn': self.add_mrcnn_configs,
          'ufrcnn': self.add_mrcnn_configs,
+         'ufrcnn_surrounding': self.add_mrcnn_configs,
          'retina_net': self.add_mrcnn_configs,
          'retina_unet': self.add_mrcnn_configs,
+         'prob_detector': self.add_mrcnn_configs,
         }[self.model]()
 
 
+    def add_det_unet_configs(self):
+
+        self.learning_rate = [1e-4] * self.num_epochs
+
+        # aggregation from pixel perdiction to object scores (connected component). One of ['max', 'median']
+        self.aggregation_operation = 'max'
+
+        # max number of roi candidates to identify per image (slice in 2D, volume in 3D)
+        self.n_roi_candidates = 3 if self.dim == 2 else 8
+
+        # loss mode: either weighted cross entropy ('wce'), batch-wise dice loss ('dice), or the sum of both ('dice_wce')
+        self.seg_loss_mode = 'dice_wce'
+
+        # if <1, false positive predictions in foreground are penalized less.
+        self.fp_dice_weight = 1 if self.dim == 2 else 1
+
+        self.wce_weights = [1, 1, 1]
+        self.detection_min_confidence = self.min_det_thresh
+
+        # if 'True', loss distinguishes all classes, else only foreground vs. background (class agnostic).
+        self.class_specific_seg_flag = True
+        self.num_seg_classes = 3 if self.class_specific_seg_flag else 2
+        self.head_classes = self.num_seg_classes
+
     def add_mrcnn_configs(self):
 
+        print("MRCNN specific config")
+
         # learning rate is a list with one entry per epoch.
-        ## SD - might need adjust learning rate to smaller value, https://github.com/facebookresearch/maskrcnn-benchmark/issues/658
         self.learning_rate = [1e-4] * self.num_epochs
- 
+
         # disable mask head loss. (e.g. if no pixelwise annotations available)
         self.frcnn_mode = False
 
@@ -222,7 +285,7 @@ class configs(DefaultConfigs):
         self.n_plot_rpn_props = 5 if self.dim == 2 else 30
 
         # number of classes for head networks: n_foreground_classes + 1 (background)
-        self.head_classes = self.num_classes  ## SD - important to update this in Data Loader section!
+        self.head_classes = 3
 
         # seg_classes hier refers to the first stage classifier (RPN)
         self.num_seg_classes = 2  # foreground vs. background
@@ -232,7 +295,7 @@ class configs(DefaultConfigs):
 
         # anchor scales are chosen according to expected object sizes in data set. Default uses only one anchor scale
         # per pyramid level. (outer list are pyramid levels (corresponding to BACKBONE_STRIDES), inner list are scales per level.)
-        self.rpn_anchor_scales = {'xy': [[8], [16], [32], [64]], 'z': [[2], [4], [8], [16]]}
+        self.rpn_anchor_scales = {'xy': [ [8], [16], [32], [64]], 'z': [[2], [4], [8], [16]]}
 
         # choose which pyramid levels to extract features from: P2: 0, P3: 1, P4: 2, P5: 3.
         self.pyramid_levels = [0, 1, 2, 3]
@@ -242,6 +305,7 @@ class configs(DefaultConfigs):
 
         # anchor ratios and strides per position in feature maps.
         self.rpn_anchor_ratios = [0.5, 1, 2]
+        # self.rpn_anchor_ratios = [0.25, 0.5, 1]
         self.rpn_anchor_stride = 1
 
         # Threshold for first stage (RPN) non-maximum suppression (NMS):  LOWER == HARDER SELECTION
@@ -253,8 +317,11 @@ class configs(DefaultConfigs):
         self.roi_positive_ratio = 0.5
         self.anchor_matching_iou = 0.7
 
-        # factor of top-k candidates to draw from  per negative sample (stochastic-hard-example-mining).
-        # poolsize to draw top-k candidates from will be shem_poolsize * n_negative_samples.
+        # factor of top-k candidates to draw from  per negative sample 
+        # (stochastic-hard-example-mining).
+        # poolsize to draw top-k candidates from will be 
+        #   shem_poolsize * n_negative_samples.
+        # GG for the RPN loss computation (sampling)
         self.shem_poolsize = 10
 
         self.pool_size = (7, 7) if self.dim == 2 else (7, 7, 3)
@@ -282,7 +349,8 @@ class configs(DefaultConfigs):
         self.post_nms_rois_inference = 500
 
         # Final selection of detections (refine_detections)
-        self.model_max_instances_per_batch_element = 10 if self.dim == 2 else 30  # per batch element and class.
+        # GG self.model_max_instances_per_batch_element = 10 if self.dim == 2 else 30  # per batch element and class.
+        self.model_max_instances_per_batch_element = 25 if self.dim == 2 else 30  # per batch element and class.
         self.detection_nms_threshold = 1e-5  # needs to be > 0, otherwise all predictions are one cluster.
         self.model_min_confidence = 0.1
 
@@ -304,17 +372,25 @@ class configs(DefaultConfigs):
             self.num_seg_classes = 3 if self.class_specific_seg_flag else 2
             self.frcnn_mode = True
 
-        # GG
-        # Debug
-        # 
-        # Shuffle data inputs
-        self.debug_deactivate_shuffling = False
-        self.debug_detection_target_layer = False
-        self.debug_compute_rpn_class = False
+        if self.model == 'retina_net' or self.model == 'retina_unet' or self.model == 'prob_detector':
+            # implement extra anchor-scales according to retina-net publication.
+            self.rpn_anchor_scales['xy'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
+                                            self.rpn_anchor_scales['xy']]
+            self.rpn_anchor_scales['z'] = [[ii[0], ii[0] * (2 ** (1 / 3)), ii[0] * (2 ** (2 / 3))] for ii in
+                                           self.rpn_anchor_scales['z']]
+            self.n_anchors_per_pos = len(self.rpn_anchor_ratios) * 3
 
-        # Data Set: batch generator, ...
-        self.debug_generate_train_batch = False
-        self.debug_data_loader = False
+            self.n_rpn_features = 256 if self.dim == 2 else 64
 
-        # Dump RPN 
-        self.dumpRPN = False
+            # pre-selection of detections for NMS-speedup. per entire batch.
+            self.pre_nms_limit = 10000 if self.dim == 2 else 50000
+
+            # anchor matching iou is lower than in Mask R-CNN according to https://arxiv.org/abs/1708.02002
+            self.anchor_matching_iou = 0.5
+
+            # if 'True', seg loss distinguishes all classes, else only foreground vs. background (class agnostic).
+            self.num_seg_classes = 3 if self.class_specific_seg_flag else 2
+
+            if self.model == 'retina_unet':
+                self.operate_stride1 = True
+                self.class_specific_seg_flag = True

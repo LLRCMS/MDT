@@ -322,7 +322,97 @@ class StatOnPredictions:
         #
         # GG Plots
         #          
+
+
+    def runAndSave(self, batch_gen, fname="pred.obj"):
+        """
+        Note : Only run and return the predictions & gt
+        """
+        dict_of_results = OrderedDict()
+
+        # Get paths of all parameter sets to be loaded for 
+        # temporal ensembling. (or just one for no temp. ensembling).
+        weight_paths = [os.path.join(self.cf.fold_dir, '{}_best_checkpoint'.format(epoch), 
+                                     'params.pth') for epoch in self.epoch_ranking]
+
+        all_images =[]; all_evIDs=[]; all_gt_labels=[]; all_gt_bboxes=[]; all_gt_masks=[]; 
+        all_pred_labels=[]; all_pred_scores=[]; all_pred_bboxes=[]; all_pred_masks = [];
+
+        print( "GG weight path", weight_paths )
+        for w_ix, weight_path in enumerate(weight_paths[0:1]):
+            self.logger.info(('tmp ensembling over w_ix:{} epoch:{}'.format(w_ix, weight_path)))
+            self.net.load_state_dict(torch.load(weight_path))
+            self.net.eval()
+            # self.w_ix = str(w_ix)  # get string of current rank for unique patch ids.
+            
+            with torch.no_grad():
+                for itest in range(batch_gen['n_test']):
+                    batch = next(batch_gen['test'])
+
+                    # Test batch size
+                    if len( batch['pid'] ) != 1 and batch['data'].shape[0] != 1:
+                        print("Bad batch size", len( batch['pid'] ))
+                        exit()
+
+                    evID = batch['pid'][0]
+                    img  = batch['data'][0,0,:,:]
+                    gt_labels = batch['gt_labels'][0]
+                    gt_bboxes = batch['gt_bboxes'][0]
+                    gt_masks  = batch['gt_masks'][0]
+
+                    # print ("GG ??? RunStats batch['pid'], evID", batch['pid'], evID )
+                    # print ("GG ??? RunStats batch", batch )
+                  
+                    # Not Used
+                    # store batch info in entry of results dict.
+                    # if w_ix == 0:
+                    #    dict_of_results[evID] = {}
+
+                    results_dict = self.net.test_forward(batch, return_masks=True) # ??? return_masks=self.cf.return_masks_in_test)
+                    # print("result_dict", results_dict ) 
+
+                    # Test batch size
+                    if len( results_dict['boxes'] ) != 1:
+                        print("Bad batch size")
+                        exit()
+
+                    # 'boxes' sub-dictionnary: { 'box_coords', 'box_score', 'box_type': 'det', 'box_pred_class_id'}
+                    pred_boxes  = results_dict['boxes'][0]
+                    pred_bboxes = np.array( [ box['box_coords']        for box in pred_boxes ] )
+                    pred_scores = np.array( [ box['box_score']         for box in pred_boxes ] )
+                    pred_labels = np.array( [ box['box_pred_class_id'] for box in pred_boxes ] )
+
+                    # Test batch size
+                    if len( results_dict['seg_preds'] ) != 1:
+                        print("Bad batch size")
+                        exit()
+
+                    # Mask accumulated in one image
+                    pred_masks = results_dict['seg_preds'][0]
+                    # print(" pred_masks.shape", pred_masks.shape )
+                    all_images.append( img )
+                    all_evIDs.append( evID )
+                    all_gt_labels.append( gt_labels )
+                    all_gt_bboxes.append( gt_bboxes )
+                    all_gt_masks.append( gt_masks )  
+
+                    all_pred_labels.append( pred_labels )
+                    all_pred_scores.append( pred_scores )
+                    all_pred_bboxes.append( pred_bboxes )
+                    all_pred_masks.append( pred_masks )  
+
+        all_ = ( "Detection result file with the format: list[np.array()] ", 
+                 all_images, all_evIDs, all_gt_labels, all_gt_bboxes, all_gt_masks, 
+                 all_pred_labels, all_pred_scores, all_pred_bboxes, all_pred_masks)
         
+        with open( fname, 'wb') as file_:
+            # GG reading python2.x pickle file
+            object_ = pickle.dump(all_, file_ )
 
+        return
 
+    def loadPrediction( self, fname="pred.obj" ):
 
+        with open( fname, 'rb') as file_:
+            object_ = pickle.load(file_, encoding="latin1")  
+        return object_

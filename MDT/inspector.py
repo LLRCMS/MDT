@@ -50,7 +50,10 @@ def inference(cf, logger):
     batch_gen = data_loader.get_test_generator(cf, logger)
     data_set = batch_gen['test'].data_loader.getData()
     statObj = StatOnPredictions( cf, net, logger)
-    statObj.runStats( batch_gen, plot=False )
+    # statObj.runStats( batch_gen, plot=False )
+    statObj.runAndSave( batch_gen)
+    o = statObj.loadPrediction()
+
     """
     test_predictor = Predictor(cf, net, logger, mode='test')
     test_evaluator = Evaluator(cf, logger, mode='test')

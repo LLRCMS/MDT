@@ -18,3 +18,7 @@ MDT/Run-C0-anchor-ratio/
 MDT/Dump
 MDT/Run-shape2D/
 MDT/Run-shape3D/
+nbproject/
+
+*/*.obj
+*/*.tar

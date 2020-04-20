@@ -237,13 +237,14 @@ class StatOnPredictions:
         cumul_fn = np.zeros( (nbrIoU) )
         cumul_nbrPred = np.zeros( (nbrIoU) )
         cumul_nbrGT = np.zeros( (nbrIoU) )
- 
+
+        print("StatOnPrediction.runStats # of inference", batch_gen['n_test'] ) 
         for w_ix, weight_path in enumerate(weight_paths):
             self.logger.info(('tmp ensembling over w_ix:{} epoch:{}'.format(w_ix, weight_path)))
             self.net.load_state_dict(torch.load(weight_path))
             self.net.eval()
             self.w_ix = str(w_ix)  # get string of current rank for unique patch ids.
-            
+            print("Weight path:", weight_path )
             with torch.no_grad():
                 APs = []
                 for itest in range(batch_gen['n_test']):
@@ -294,7 +295,7 @@ class StatOnPredictions:
                     AP, AR, precisions, recalls, overlaps = MPUtl.compute_ap( 
                                                            gt_bboxes, gt_labels, gt_masks,
                                                            pred_bboxes, pred_labels, pred_scores, pred_masks)
-                    print( "AP, AR, precisions, recalls, overlaps", AP, AR, precisions, recalls )
+                    # print( "AP, AR, precisions, recalls, overlaps", AP, AR, precisions, recalls )
                     # print( overlaps )
                     APs.append( AP )
 
@@ -335,15 +336,15 @@ class StatOnPredictions:
         weight_paths = [os.path.join(self.cf.fold_dir, '{}_best_checkpoint'.format(epoch), 
                                      'params.pth') for epoch in self.epoch_ranking]
 
-        all_images =[]; all_evIDs=[]; all_gt_labels=[]; all_gt_bboxes=[]; all_gt_masks=[]; 
-        all_pred_labels=[]; all_pred_scores=[]; all_pred_bboxes=[]; all_pred_masks = [];
 
         print( "GG weight path", weight_paths )
-        for w_ix, weight_path in enumerate(weight_paths[0:1]):
+        for w_ix, weight_path in enumerate(weight_paths):
             self.logger.info(('tmp ensembling over w_ix:{} epoch:{}'.format(w_ix, weight_path)))
             self.net.load_state_dict(torch.load(weight_path))
             self.net.eval()
             # self.w_ix = str(w_ix)  # get string of current rank for unique patch ids.
+            all_images =[]; all_evIDs=[]; all_gt_labels=[]; all_gt_bboxes=[]; all_gt_masks=[]; 
+            all_pred_labels=[]; all_pred_scores=[]; all_pred_bboxes=[]; all_pred_masks = [];
             
             with torch.no_grad():
                 for itest in range(batch_gen['n_test']):
@@ -401,13 +402,14 @@ class StatOnPredictions:
                     all_pred_bboxes.append( pred_bboxes )
                     all_pred_masks.append( pred_masks )  
 
-        all_ = ( "Detection result file with the format: list[np.array()] ", 
+            all_ = ( "Detection result file with the format: list[np.array()] ", 
                  all_images, all_evIDs, all_gt_labels, all_gt_bboxes, all_gt_masks, 
                  all_pred_labels, all_pred_scores, all_pred_bboxes, all_pred_masks)
-        
-        with open( fname, 'wb') as file_:
-            # GG reading python2.x pickle file
-            object_ = pickle.dump(all_, file_ )
+            fname = "pred_{}.obj".format( str(self.epoch_ranking[w_ix]))
+            print("fname", fname)
+            with open( fname, 'wb') as file_:
+              # GG reading python2.x pickle file
+              object_ = pickle.dump(all_, file_ )
 
         return
 

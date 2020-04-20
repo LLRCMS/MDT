@@ -148,7 +148,7 @@ class configs(DefaultConfigs):
         self.test_aug = False
 
 
-        self.num_test_batches = 16
+        self.num_test_batches = 100
 
         #########################
         #   Testing / Plotting  #

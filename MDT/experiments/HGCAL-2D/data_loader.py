@@ -119,6 +119,7 @@ def load_dataset(cf, logger, subset_ixs=None):
         print("Error: mode not available")
         exit()
 
+    print("data_loader: read", len(images_), "events" )
     data = OrderedDict()
     data['images'] = images_
     data['labels'] = labelIDs_

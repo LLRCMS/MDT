@@ -67,7 +67,8 @@ def load_dataset(cf, logger, subset_ixs=None):
 
     # Create Shapes Dataset
     #from shapes import ShapesDataset, extract_bboxes, non_max_suppression
-    dataset = ShapesDataset(num_samples=cf.num_samples, height= cf.pre_crop_size_2D[0], width=cf.pre_crop_size_2D[1])
+    # GG3D dataset = ShapesDataset(num_samples=cf.num_samples, height= cf.pre_crop_size_2D[0], width=cf.pre_crop_size_2D[1])
+    dataset = ShapesDataset(num_samples=cf.num_samples, height= cf.pre_crop_size_3D[0], width=cf.pre_crop_size_3D[1], depth=cf.pre_crop_size_3D[2])
 
     dataset.load_shapes()
     dataset.prepare()
@@ -119,6 +120,7 @@ def create_data_gen_pipeline(sample_data, cf, nbrSamples=0, do_aug=True):
     # add transformations to pipeline.
     my_transforms = []
     if do_aug:
+        print("ERROR: Data augmentation shouldn't be used")
         mirror_transform = Mirror(axes=np.arange(2, cf.dim+2, 1))
         my_transforms.append(mirror_transform)
         spatial_transform = SpatialTransform(patch_size=cf.patch_size[:cf.dim],
@@ -209,9 +211,10 @@ class BatchGenerator(SlimDataLoaderBase):
         C = self.cf.n_channels
         xSize = self._data['xSize']
         ySize = self._data['ySize']
+        zSize = self._data['zSize']
 
         # Allocate/type return values
-        batch_images     = np.zeros( (B, C, xSize, ySize) )
+        batch_images     = np.zeros( (B, C, xSize, ySize, zSize) )
         batch_pid        = [] # Image index (used in post-processing)
         batch_gt_classes = []
         batch_gt_bboxes  = []
@@ -226,17 +229,20 @@ class BatchGenerator(SlimDataLoaderBase):
             evIdx = self.shuffleEvIdx[ idx ]
 
             # Load GT images, masks, class labels/IDs, bounding boxes using evIdx
-            image = dataset.load_image(evIdx) # orig shape is [H,W,C]
-            mask, class_label = dataset.load_mask(evIdx) # orig mask shape is [H,W,nObjs]
+            image = dataset.load_image(evIdx) # orig shape is [H,W,D,C]
+            mask, class_label = dataset.load_mask(evIdx) # orig mask shape is [H,W,D, nObjs]
             class_id = dataset.map_classnames_to_classids(class_label) # this is a numpy array
-            bbox = extract_bboxes(mask) # orig shape is [nObjs,(y1,x1,y2,x2)] ~ [nObjs,4]
+        
+            bbox = extract_bboxes(mask) # orig shape is [nObjs,(y1,x1,z1, y2,x2,z2)] ~ [nObjs,6]
              
             # Expands dims of class_id
             class_id = np.expand_dims(class_id, axis=-1) 
 
             # Images
             # NOTE: take care to transpose correctly!
-            batch_images[ii,:,:,:] = np.transpose(image, (2,1,0)) # shape is now [B,C,W,H]
+            # GG3D batch_images[ii,:,:,:] = np.transpose(image, (2,1,0)) # shape is now [B,C,W,H]
+            # [H,W,D,C] ->[C,W,H,D]
+            batch_images[ii,:,:,:] = np.transpose(image, (3,1,0,2)) # shape is now [B,C,W,H]
 
             # GT classes
             nObjs = len( labelsIDs[evIdx] )
@@ -244,18 +250,19 @@ class BatchGenerator(SlimDataLoaderBase):
                 print("number of objects is ", nObjs)
 
             # BBoxes and Masks allocation
-            gt_bboxes = np.zeros( (nObjs, 4), dtype=np.float )
-            gt_masks  = np.zeros( (nObjs, C, xSize, ySize) )
+            gt_bboxes = np.zeros( (nObjs, 6), dtype=np.float )
+            gt_masks  = np.zeros( (nObjs, C, xSize, ySize, zSize) )
            
             for k in range(nObjs):
                 # BBoxes
-                y1, x1, y2, x2 = bbox[k,:]
-                gt_bboxes[k, :] = x1, y1, x2, y2 # format is now [nObjs, (x1,y1,x2,y2)]
+                y1, x1, z1, y2, x2, z2 = bbox[k,:]
+                gt_bboxes[k, :] = x1, y1, z1, x2, y2, z2  # format is now [nObjs, (x1,y1,x2,y2)]
 
                 # Masks
                 # NOTE: take care to transpose and expand dimension correctly!
-                mask_k = np.expand_dims(mask[:,:,k], axis=-1) # shape is now [H,W,1]
-                gt_masks[k,0,:,:] =  np.transpose(mask_k, (2,1,0)) # shape is now [nObjs,C,W,H]
+                mask_k = np.expand_dims(mask[:,:,:,k], axis=-1) # shape is now [H,W,1]
+                # GG3D gt_masks[k,0,:,:] =  np.transpose(mask_k, (2,1,0)) # shape is now [nObjs,C,W,H]
+                gt_masks[k,0,:,:,:] =  np.transpose(mask_k, (3,1,0,2)) # shape is now [nObjs,C,W,H]
 
             # Batch update
             batch_pid.append( evIdx )

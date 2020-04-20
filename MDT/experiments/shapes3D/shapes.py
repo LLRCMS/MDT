@@ -167,7 +167,7 @@ class ShapesDataset(Dataset):
     shapes (triangles, squares, circles) placed randomly on a blank surface.
     The images are generated on the fly. No file access required.
     """
-    def __init__(self, num_samples, height, width):
+    def __init__(self, num_samples, height, width, depth):
         """
         num_samples: number of samples images to generate.
         height, width: the size of the generated images.
@@ -176,6 +176,8 @@ class ShapesDataset(Dataset):
         self.num_samples = num_samples
         self.height = height
         self.width = width
+        # 3D
+        self.depth = depth
 
         self.classes = ["background", "square", "circle", "triangle"]
 
@@ -194,9 +196,9 @@ class ShapesDataset(Dataset):
         # list of shapes sizes and locations). This is more compact than
         # actual images. Images are generated on the fly in load_image().
         for i in range(self.num_samples):
-            bg_color, shapes = self.random_image(self.height, self.width)
+            bg_color, shapes = self.random_image(self.height, self.width, self.depth)
             self.add_image("shapes", image_id=i, path=None,
-                           width=self.width, height=self.height,
+                           width=self.width, height=self.height, depth = self.depth
                            bg_color=bg_color, shapes=shapes)
 
     def image_reference(self, image_id):
@@ -207,6 +209,7 @@ class ShapesDataset(Dataset):
         else:
             super(self.__class__).image_reference(self, image_id)
 
+    # 3D OK
     def load_image(self, image_id):
         """Generate an image from the specs of the given image ID.
         Typically this function loads the image from a file, but
@@ -214,10 +217,12 @@ class ShapesDataset(Dataset):
         specs in image_info.
         """
         info = self.image_info[image_id]
+        # 3D ???
         bg_color = np.array(info['bg_color']).reshape([1, 1, 3])
-        image = np.ones([info['height'], info['width'], 3], dtype=np.uint8)
+        image = np.ones([info['height'], info['width'], info['depth'], 3], dtype=np.uint8)
         image = image * bg_color.astype(np.uint8)
         for shape, color, dims in info['shapes']:
+            print("GG shape.py shape, color, dims", shape, color, dims)
             image = self.draw_shape(image, shape, dims, color)
         return image
 
@@ -227,37 +232,47 @@ class ShapesDataset(Dataset):
         info = self.image_info[image_id]
         shapes = info['shapes']
         count = len(shapes)
-        mask = np.zeros([info['height'], info['width'], count], dtype=np.uint8)
+        mask = np.zeros([info['height'], info['width'], info['depth'], count], dtype=np.uint8)
         for i, (shape, _, dims) in enumerate(info['shapes']):
-            mask[:, :, i:i+1] = self.draw_shape(mask[:, :, i:i+1].copy(),
+            mask[:, :, :, i:i+1] = self.draw_shape(mask[:, :, :, i:i+1].copy(),
                                                 shape, dims, 1)
         # Handle occlusions
-        occlusion = np.logical_not(mask[:, :, -1]).astype(np.uint8)
+        occlusion = np.logical_not(mask[:, :, :, -1]).astype(np.uint8)
         for i in range(count-2, -1, -1):
-            mask[:, :, i] = mask[:, :, i] * occlusion
-            occlusion = np.logical_and(occlusion, np.logical_not(mask[:, :, i]))
+            mask[:, :, :, i] = mask[:, :, :, i] * occlusion
+            occlusion = np.logical_and(occlusion, np.logical_not(mask[:, :, :, i]))
 
          # SD - change mask type from bool to uint8 and return class_ids as names
         class_ids = np.array([s[0] for s in shapes])
         return mask.astype('uint8'), class_ids #class_ids.astype(np.int32)
 
+    # 3D OK
     def draw_shape(self, image, shape, dims, color):
         """Draws a shape from the given specs."""
         # Get the center x, y and the size s
-        x, y, s = dims
+        # 3D
+        x, y, z,  s = dims
+        print('Center & size : ', x, y,z, s)
+        # GG
+        # Input SHAPE image = np.ones([info['height'], info['width'], info['width'], 3], dtype=np.uint8)
+        img2D = np.ones([info['height'], info['width'], 3], dtype=np.uint8)
         if shape == 'square':
-            cv2.rectangle(image, (x-s, y-s), (x+s, y+s), color, -1)
+            cv2.rectangle(img2D, (x-s, y-s), (x+s, y+s), color, -1)
+
         elif shape == "circle":
-            cv2.circle(image, (x, y), s, color, -1)
+            cv2.circle(img2D, (x, y), s, color, -1)
         elif shape == "triangle":
             points = np.array([[(x, y-s),
                                 (x-s/math.sin(math.radians(60)), y+s),
                                 (x+s/math.sin(math.radians(60)), y+s),
                                 ]], dtype=np.int32)
-            cv2.fillPoly(image, points, color)
+            cv2.fillPoly(img2D, points, color)
+        # GG extend to 3D ??? Take care +1
+        for k in range(z-s, z+s+1)
+          image[:,:,k,:] = img2D[:,:,:]
         return image
 
-    def random_shape(self, height, width):
+    def random_shape(self, height, width, depth):
         """Generates specifications of a random shape that lies within
         the given height and width boundaries.
         Returns a tuple of three valus:
@@ -274,11 +289,12 @@ class ShapesDataset(Dataset):
         buffer = 20
         y = random.randint(buffer, height - buffer - 1)
         x = random.randint(buffer, width - buffer - 1)
+        z = random.randint(buffer, depth - buffer - 1)
         # Size
-        s = random.randint(buffer, height//4)
-        return shape, color, (x, y, s)
+        s = random.randint(buffer, depth//4)
+        return shape, color, (x, y, z, s)
 
-    def random_image(self, height, width):
+    def random_image(self, height, width, depth):
         """Creates random specifications of an image with multiple shapes.
         Returns the background color of the image and a list of shape
         specifications that can be used to draw the image.
@@ -291,13 +307,15 @@ class ShapesDataset(Dataset):
         boxes = []
         N = random.randint(1, 4)
         for _ in range(N):
-            shape, color, dims = self.random_shape(height, width)
+            shape, color, dims = self.random_shape(height, width, depth)
+            print("New random image shape, color, dims", shape, color, dims )
             shapes.append((shape, color, dims))
-            x, y, s = dims
-            boxes.append([y-s, x-s, y+s, x+s])
+            x, y, z, s = dims
+            boxes.append([y-s, x-s, z-s, y+s, x+s, z+s])
         # Apply non-max suppression wit 0.3 threshold to avoid
         # shapes covering each other
-        keep_ixs = non_max_suppression(np.array(boxes), np.arange(N), 0.3)
+        # GG 3D 
+        keep_ixs = non_max_suppression3D(np.array(boxes), np.arange(N), 0.3)
         shapes = [s for i, s in enumerate(shapes) if i in keep_ixs]
         return bg_color, shapes
 
@@ -345,11 +363,14 @@ def resize_image(image, min_dim=None, max_dim=None, min_scale=None, mode="square
     # Keep track of image dtype and return results in the same dtype
     image_dtype = image.dtype
     # Default window (y1, x1, y2, x2) and default scale == 1.
-    h, w = image.shape[:2]
-    window = (0, 0, h, w)
+    h, w, z = image.shape[:3]
+    window = (0, 0, h, w, z)
     scale = 1
     padding = [(0, 0), (0, 0), (0, 0)]
     crop = None
+
+    print("Resize_image: Error not implemented")
+    return image, window, scale, padding, crop
 
     if mode == "none":
         return image, window, scale, padding, crop
@@ -425,6 +446,9 @@ def resize_mask(mask, scale, padding, crop=None):
     padding: Padding to add to the mask in the form
             [(top, bottom), (left, right), (0, 0)]
     """
+    print("Resize_mask: Error not implemented")
+    return mask
+
     # Suppress warning from scipy 0.13.0, the output shape of zoom() is
     # calculated with round() instead of int()
     with warnings.catch_warnings():
@@ -443,6 +467,9 @@ def minimize_mask(bbox, mask, mini_shape):
     Mini-masks can be resized back to image scale using expand_masks()
     See inspect_data.ipynb notebook for more details.
     """
+    print("minimize_mask: Error not implemented")
+    return mini_mask
+
     mini_mask = np.zeros(mini_shape + (mask.shape[-1],), dtype=bool)
     for i in range(mask.shape[-1]):
         # Pick slice and cast to bool in case load_mask() returned wrong dtype
@@ -463,30 +490,34 @@ def minimize_mask(bbox, mask, mini_shape):
 
 def extract_bboxes(mask):
     """Compute bounding boxes from masks.
-    mask: [height, width, num_instances]. Mask pixels are either 1 or 0.
-    Returns: bbox array [num_instances, (y1, x1, y2, x2)].
+    mask: [height, width, depht, num_instances]. Mask pixels are either 1 or 0.
+    Returns: bbox array [num_instances, (y1, x1, z1, y2, x2, z1)].
     """
-    boxes = np.zeros([mask.shape[-1], 4], dtype=np.int32)
+    # GG3D boxes = np.zeros([mask.shape[-1], 4], dtype=np.int32)
+    boxes = np.zeros([mask.shape[-1], 6], dtype=np.int32)
     for i in range(mask.shape[-1]):
-        m = mask[:, :, i]
+        m = mask[:, :, :, i]
         # Bounding box.
         horizontal_indicies = np.where(np.any(m, axis=0))[0]
         vertical_indicies = np.where(np.any(m, axis=1))[0]
+        depth_indicies = np.where(np.any(m, axis=2))[0]
         if horizontal_indicies.shape[0]:
             x1, x2 = horizontal_indicies[[0, -1]]
             y1, y2 = vertical_indicies[[0, -1]]
+            z1, z2 = detph_indicies[[0, -1]]
             # x2 and y2 should not be part of the box. Increment by 1.
             x2 += 1
             y2 += 1
+            z2 += 1
         else:
             # No mask for this instance. Might happen due to
             # resizing or cropping. Set bbox to zeros
-            x1, x2, y1, y2 = 0, 0, 0, 0
-        boxes[i] = np.array([y1, x1, y2, x2])
+            x1, x2, y1, y2, z1, z2 = 0, 0, 0, 0, 0, 0
+        boxes[i] = np.array([y1, x1, z1, y2, x2, z2])
     return boxes.astype(np.float) # return as float values instead of int32
 
 
-def compute_iou(box, boxes, box_area, boxes_area):
+def compute_iou3D(box, boxes, box_area, boxes_area):
     """Calculates IoU of the given box with the array of the given boxes.
     box: 1D vector [y1, x1, y2, x2]
     boxes: [boxes_count, (y1, x1, y2, x2)]
@@ -497,16 +528,18 @@ def compute_iou(box, boxes, box_area, boxes_area):
     """
     # Calculate intersection areas
     y1 = np.maximum(box[0], boxes[:, 0])
-    y2 = np.minimum(box[2], boxes[:, 2])
+    y2 = np.minimum(box[3], boxes[:, 3])
     x1 = np.maximum(box[1], boxes[:, 1])
-    x2 = np.minimum(box[3], boxes[:, 3])
-    intersection = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
+    x2 = np.minimum(box[4], boxes[:, 4])
+    z1 = np.maximum(box[2], boxes[:, 2])
+    z2 = np.minimum(box[5], boxes[:, 5])
+    intersection = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0) * np.maximum(z2 - z1, 0)
     union = box_area + boxes_area[:] - intersection[:]
     iou = intersection / union
     return iou
 
 
-def non_max_suppression(boxes, scores, threshold):
+def non_max_suppression3D(boxes, scores, threshold):
     """Performs non-maximum suppression and returns indices of kept boxes.
     boxes: [N, (y1, x1, y2, x2)]. Notice that (y2, x2) lays outside the box.
     scores: 1-D array of box scores.
@@ -519,9 +552,11 @@ def non_max_suppression(boxes, scores, threshold):
     # Compute box areas
     y1 = boxes[:, 0]
     x1 = boxes[:, 1]
-    y2 = boxes[:, 2]
-    x2 = boxes[:, 3]
-    area = (y2 - y1) * (x2 - x1)
+    z1 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    x2 = boxes[:, 4]
+    z2 = boxes[:, 5]
+    area = (y2 - y1) * (x2 - x1)*(z2 - z1)
 
     # Get indicies of boxes sorted by scores (highest first)
     ixs = scores.argsort()[::-1]
@@ -532,7 +567,7 @@ def non_max_suppression(boxes, scores, threshold):
         i = ixs[0]
         pick.append(i)
         # Compute IoU of the picked box with the rest
-        iou = compute_iou(boxes[i], boxes[ixs[1:]], area[i], area[ixs[1:]])
+        iou = compute_iou3D(boxes[i], boxes[ixs[1:]], area[i], area[ixs[1:]])
         # Identify boxes with IoU over the threshold. This
         # returns indices into ixs[1:], so add 1 to get
         # indices into ixs.

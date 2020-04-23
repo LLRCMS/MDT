@@ -459,6 +459,7 @@ def plot_prediction_hist(label_list, pred_list, type_list, outfile):
     """
     preds = np.array(pred_list)
     labels = np.array(label_list)
+    print("GG outfile", outfile)
     title = outfile.split('/')[-1] + ' count:{}'.format(len(label_list))
     plt.figure()
     plt.yscale('log')

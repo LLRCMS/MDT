@@ -234,7 +234,8 @@ def prepare_monitoring(cf):
     metrics['val']['monitor_values'] = [[] for _ in range(cf.num_epochs + 1)]
 
     # generate isntance of monitor plot class.
-    # GG Codiv 19 ??? TrainingPlot = plotting.TrainingPlot_2Panel(cf)
+    # GG Codiv 19 ??? 
+    # TrainingPlot = plotting.TrainingPlot_2Panel(cf)
     TrainingPlot = None
 
     return metrics, TrainingPlot

@@ -101,6 +101,7 @@ def load_dataset(cf, logger, subset_ixs=None):
     data['labels'] = labelIDs
     data['xSize'] = dataset.width
     data['ySize'] = dataset.height
+    data['zSize'] = dataset.depth
 
     return data
 
@@ -256,14 +257,16 @@ class BatchGenerator(SlimDataLoaderBase):
             for k in range(nObjs):
                 # BBoxes
                 y1, x1, z1, y2, x2, z2 = bbox[k,:]
-                gt_bboxes[k, :] = x1, y1, z1, x2, y2, z2  # format is now [nObjs, (x1,y1,x2,y2)]
-
+                # gt_bboxes[k, :] = x1, y1, z1, x2, y2, z2  # format is now [nObjs, (x1,y1,x2,y2)]
+                # Format required : y1,      x1,    y2,   x2,    z1,   z2 
+                gt_bboxes[k, :] = y1, x1, y2, x2, z1, z2  # format is now [nObjs, (x1,y1,x2,y2)]
                 # Masks
                 # NOTE: take care to transpose and expand dimension correctly!
                 mask_k = np.expand_dims(mask[:,:,:,k], axis=-1) # shape is now [H,W,1]
                 # GG3D gt_masks[k,0,:,:] =  np.transpose(mask_k, (2,1,0)) # shape is now [nObjs,C,W,H]
                 gt_masks[k,0,:,:,:] =  np.transpose(mask_k, (3,1,0,2)) # shape is now [nObjs,C,W,H]
 
+            # 3D debug print("generate_train_batch gt_boxes:", gt_bboxes )
             # Batch update
             batch_pid.append( evIdx )
             batch_gt_classes.append( class_id )

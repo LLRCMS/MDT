@@ -198,7 +198,7 @@ class ShapesDataset(Dataset):
         for i in range(self.num_samples):
             bg_color, shapes = self.random_image(self.height, self.width, self.depth)
             self.add_image("shapes", image_id=i, path=None,
-                           width=self.width, height=self.height, depth = self.depth
+                           width=self.width, height=self.height, depth = self.depth,
                            bg_color=bg_color, shapes=shapes)
 
     def image_reference(self, image_id):
@@ -222,7 +222,7 @@ class ShapesDataset(Dataset):
         image = np.ones([info['height'], info['width'], info['depth'], 3], dtype=np.uint8)
         image = image * bg_color.astype(np.uint8)
         for shape, color, dims in info['shapes']:
-            print("GG shape.py shape, color, dims", shape, color, dims)
+            # 3D Debug print("GG shape.py shape, color, dims", shape, color, dims)
             image = self.draw_shape(image, shape, dims, color)
         return image
 
@@ -252,10 +252,13 @@ class ShapesDataset(Dataset):
         # Get the center x, y and the size s
         # 3D
         x, y, z,  s = dims
+        """Debug
+        print("shape & color", shape, color )
         print('Center & size : ', x, y,z, s)
+        """
         # GG
         # Input SHAPE image = np.ones([info['height'], info['width'], info['width'], 3], dtype=np.uint8)
-        img2D = np.ones([info['height'], info['width'], 3], dtype=np.uint8)
+        img2D = np.zeros([image.shape[0], image.shape[1], image.shape[-1]], dtype=np.uint8)
         if shape == 'square':
             cv2.rectangle(img2D, (x-s, y-s), (x+s, y+s), color, -1)
 
@@ -268,8 +271,10 @@ class ShapesDataset(Dataset):
                                 ]], dtype=np.int32)
             cv2.fillPoly(img2D, points, color)
         # GG extend to 3D ??? Take care +1
-        for k in range(z-s, z+s+1)
+        # print("draw_shape: z, z-s, z+s+1", z, z-s, z+s+1) 
+        for k in range( max(0,z-s), min(image.shape[2], z+s+1) ):
           image[:,:,k,:] = img2D[:,:,:]
+        # print("draw_shape: image.shape", image.shape) 
         return image
 
     def random_shape(self, height, width, depth):
@@ -286,7 +291,7 @@ class ShapesDataset(Dataset):
         # Color
         color = tuple([random.randint(0, 255) for _ in range(3)])
         # Center x, y
-        buffer = 20
+        buffer = 10
         y = random.randint(buffer, height - buffer - 1)
         x = random.randint(buffer, width - buffer - 1)
         z = random.randint(buffer, depth - buffer - 1)
@@ -308,7 +313,7 @@ class ShapesDataset(Dataset):
         N = random.randint(1, 4)
         for _ in range(N):
             shape, color, dims = self.random_shape(height, width, depth)
-            print("New random image shape, color, dims", shape, color, dims )
+            # print("New random image shape, color, dims", shape, color, dims )
             shapes.append((shape, color, dims))
             x, y, z, s = dims
             boxes.append([y-s, x-s, z-s, y+s, x+s, z+s])
@@ -497,23 +502,31 @@ def extract_bboxes(mask):
     boxes = np.zeros([mask.shape[-1], 6], dtype=np.int32)
     for i in range(mask.shape[-1]):
         m = mask[:, :, :, i]
+        # Debug print("mask sum ", np.sum(m) )
+        mxy = np.sum( m, axis=2 )
+        mxz = np.sum( m, axis=1 )
         # Bounding box.
-        horizontal_indicies = np.where(np.any(m, axis=0))[0]
-        vertical_indicies = np.where(np.any(m, axis=1))[0]
-        depth_indicies = np.where(np.any(m, axis=2))[0]
+        # print(np.where(np.any(m, axis=0)))
+        # print(np.where(np.any(m, axis=1)))
+        # print(np.where(np.any(m, axis=2)))
+        horizontal_indicies = np.where(np.any(mxy, axis=1))[0]
+        vertical_indicies = np.where(np.any(mxy, axis=0))[0]
+        depth_indicies = np.where(np.any(mxz, axis=0))[0]
         if horizontal_indicies.shape[0]:
             x1, x2 = horizontal_indicies[[0, -1]]
             y1, y2 = vertical_indicies[[0, -1]]
-            z1, z2 = detph_indicies[[0, -1]]
+            z1, z2 = depth_indicies[[0, -1]]
             # x2 and y2 should not be part of the box. Increment by 1.
             x2 += 1
             y2 += 1
             z2 += 1
         else:
             # No mask for this instance. Might happen due to
-            # resizing or cropping. Set bbox to zeros
+            # resizing or cropping. Set box to zeros
             x1, x2, y1, y2, z1, z2 = 0, 0, 0, 0, 0, 0
         boxes[i] = np.array([y1, x1, z1, y2, x2, z2])
+        # Debug print("extract boxes x y z", x1, x2, y1, y2, z1, z2 )
+
     return boxes.astype(np.float) # return as float values instead of int32
 
 

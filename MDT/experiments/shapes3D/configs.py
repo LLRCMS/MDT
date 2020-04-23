@@ -77,7 +77,7 @@ class configs(DefaultConfigs):
         #      Data Loader      #
         #########################
         # set number of samples for dataset, shapes.py will use this value to generate dataset
-        self.num_samples = 1000 
+        self.num_samples = 100 
         
 	# set number of classes depending on dataset, N classes (i.e. square, circle, triangle) + 1 for background
         # this will define the self.head_classes in add_mrcnn_configs()
@@ -90,8 +90,8 @@ class configs(DefaultConfigs):
         # GG set the cropped size to run successfully the program
         self.pre_crop_size_2D = [320, 320] # [256, 256]
         self.patch_size_2D = [320, 320 ]# [256, 256]
-        self.pre_crop_size_3D = [320, 320, 320] # [256, 256]
-        self.patch_size_3D = [320, 320, 320 ]# [256, 256]
+        self.pre_crop_size_3D = [256, 256, 64] # [256, 256]
+        self.patch_size_3D = [256, 256, 64 ]# [256, 256]
 
         self.patch_size = self.patch_size_2D if self.dim == 2 else self.patch_size_3D
         self.pre_crop_size = self.pre_crop_size_2D if self.dim == 2 else self.pre_crop_size_3D
@@ -163,7 +163,7 @@ class configs(DefaultConfigs):
         # if too high, preds of the same object are separate clusters.
         self.wcs_iou = 1e-5
 
-        self.plot_prediction_histograms = True
+        self.plot_prediction_histograms = False
         self.plot_stat_curves = False
        
         #########################
@@ -265,8 +265,12 @@ class configs(DefaultConfigs):
 
         self.rpn_bbox_std_dev = np.array([0.1, 0.1, 0.1, 0.2, 0.2, 0.2])
         self.bbox_std_dev = np.array([0.1, 0.1, 0.1, 0.2, 0.2, 0.2])
-        self.window = np.array([0, 0, self.patch_size[0], self.patch_size[1]])
-        self.scale = np.array([self.patch_size[0], self.patch_size[1], self.patch_size[0], self.patch_size[1]])
+        # 3D self.window = np.array([0, 0, self.patch_size[0], self.patch_size[1]])
+        # See clip_boxes_3D : window: [6] in the form y1, x1, y2, x2, z1, z2
+        self.window = np.array([0, 0, self.patch_size[0], self.patch_size[1], 0, self.patch_size[2]])
+        # In 3D ???
+        self.scale = np.array([self.patch_size[0], self.patch_size[1], self.patch_size[0], self.patch_size[1], 
+                               self.patch_size[2],self.patch_size[2]])
 
         if self.dim == 2:
             self.rpn_bbox_std_dev = self.rpn_bbox_std_dev[:4]

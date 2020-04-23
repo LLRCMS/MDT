@@ -270,6 +270,7 @@ def compute_rpn_bbox_loss(rpn_target_deltas, rpn_pred_deltas, rpn_match):
         target_deltas = rpn_target_deltas[:rpn_pred_deltas.size()[0], :]
         # Smooth L1 loss
         loss = F.smooth_l1_loss(rpn_pred_deltas, target_deltas)
+        # print("compute_rpn_bbox_loss rpn_pred_deltas", rpn_pred_deltas.shape, target_deltas.shape)
     else:
         loss = torch.FloatTensor([0]).cuda()
 
@@ -394,6 +395,9 @@ def proposal_layer(rpn_pred_probs, rpn_pred_deltas, proposal_count, anchors, cf)
             norm = torch.from_numpy(cf.scale).float().cuda()
 
         else:
+            # print("proposal_layer anchor/deltas shapes", anchors.shape, deltas.shape)
+            # print("proposal_layer anchors", anchors[:10])
+            # print("proposal_layer deltas", deltas[:10])
             boxes = mutils.apply_box_deltas_3D(anchors, deltas)
             boxes = mutils.clip_boxes_3D(boxes, cf.window)
             keep = nms_3D(torch.cat((boxes, scores.unsqueeze(1)), 1), cf.rpn_nms_threshold)
@@ -415,6 +419,7 @@ def proposal_layer(rpn_pred_probs, rpn_pred_deltas, proposal_count, anchors, cf)
         batch_out_proposals.append(torch.cat((boxes, rpn_scores), 1).cpu().data.numpy())
         # normalize dimensions to range of 0 to 1.
         normalized_boxes = boxes / norm
+        # print("mrcnn normalized_boxes", normalized_boxes[:10])
         # add back batch dimension
         batch_normalized_boxes.append(normalized_boxes.unsqueeze(0))
 
@@ -1014,6 +1019,8 @@ class net(nn.Module):
 
             # compute RPN losses.
             # GG add cf in parameter fct
+            # 3D print("train_forward b rpn_pred_deltas", b, rpn_target_deltas, rpn_pred_deltas[b])
+
             rpn_class_loss, neg_anchor_ix = compute_rpn_class_loss(self.cf, rpn_match, rpn_class_logits[b], self.cf.shem_poolsize)
             rpn_bbox_loss = compute_rpn_bbox_loss(rpn_target_deltas, rpn_pred_deltas[b], rpn_match)
             batch_rpn_class_loss += rpn_class_loss / img.shape[0]
@@ -1134,7 +1141,7 @@ class net(nn.Module):
         outputs = list(zip(*layer_outputs))
         outputs = [torch.cat(list(o), dim=1) for o in outputs]
         rpn_pred_logits, rpn_pred_probs, rpn_pred_deltas = outputs
-
+        # 3D print("forward rpn_pred_logits",rpn_pred_logits, rpn_pred_probs, rpn_pred_deltas) 
         # GG Dump
         global df
         if self.cf.dumpRPN:

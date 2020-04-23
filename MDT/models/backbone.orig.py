@@ -159,11 +159,11 @@ class FPN(nn.Module):
         out_list = [p2_out, p3_out, p4_out, p5_out]
 
         # plot feature map shapes for debugging.
-        for ii in [ c1_out, c2_out, c3_out, c4_out, c5_out]:
-             print ("encoder shapes:", ii.shape)
+        # for ii in [ c1_out, c2_out, c3_out, c4_out, c5_out]:
+        #     print ("encoder shapes:", ii.shape)
         #
-        for ii in [ p5_out, p4_out, p3_out, p2_out]:
-             print("decoder shapes:", ii.shape)
+        # for ii in [ p5_out, p4_out, p3_out, p2_out]:
+            # print("decoder shapes:", ii.shape)
 
 
         if self.sixth_pooling:

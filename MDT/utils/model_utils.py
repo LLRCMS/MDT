@@ -388,6 +388,8 @@ def clip_boxes_3D(boxes, window):
     boxes: [N, 6] each col is y1, x1, y2, x2, z1, z2
     window: [6] in the form y1, x1, y2, x2, z1, z2
     """
+    # print("clip_boxes3D b", boxes[1:6,:])
+    # print("clip_boxes3D w", window)
     boxes = torch.stack( \
         [boxes[:, 0].clamp(float(window[0]), float(window[2])),
          boxes[:, 1].clamp(float(window[1]), float(window[3])),
@@ -395,6 +397,7 @@ def clip_boxes_3D(boxes, window):
          boxes[:, 3].clamp(float(window[1]), float(window[3])),
          boxes[:, 4].clamp(float(window[4]), float(window[5])),
          boxes[:, 5].clamp(float(window[4]), float(window[5]))], 1)
+    # print("clip_boxes3D clipped", boxes[1:6,:])
     return boxes
 
 
@@ -523,6 +526,9 @@ def gt_anchor_matching(cf, anchors, gt_boxes, gt_class_ids=None):
     anchor_delta_targets = np.zeros((cf.rpn_train_anchors_per_image, 2*cf.dim))
     anchor_matching_iou = cf.anchor_matching_iou
 
+    # print("gt_anchors_matching all GT", gt_boxes[1:10])
+    # print("gt_anchors_matching all anchors", anchors[1:10])
+
     if gt_boxes is None:
         anchor_class_matches = np.full(anchor_class_matches.shape, fill_value=-1)
         return anchor_class_matches, anchor_delta_targets
@@ -577,7 +583,9 @@ def gt_anchor_matching(cf, anchors, gt_boxes, gt_class_ids=None):
     for i, a in zip(ids, anchors[ids]):
         # closest gt box (it might have IoU < anchor_matching_iou)
         gt = gt_boxes[anchor_iou_argmax[i]]
-
+        # print("gt_anchors_matching GT", overlaps)
+        # print("gt_anchors_matching GT", gt)
+        # print("gt_anchors_matching anchor", a)
         # convert coordinates to center plus width/height.
         gt_h = gt[2] - gt[0]
         gt_w = gt[3] - gt[1]
@@ -613,6 +621,10 @@ def gt_anchor_matching(cf, anchors, gt_boxes, gt_class_ids=None):
             ]
 
         # normalize.
+        # print("gt_anchor_matching gt center :", gt_center_x, gt_center_y, gt_center_z)
+        # print("gt_anchor_matching gt size :", gt_w, gt_h, gt_d)
+        # print("gt_anchor_matching a center :", a_center_x, a_center_y, a_center_z)
+        # print("gt_anchor_matching a size :", a_w, a_h, a_d)
         anchor_delta_targets[ix] /= cf.rpn_bbox_std_dev
         ix += 1
 

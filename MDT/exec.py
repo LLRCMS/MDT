@@ -26,8 +26,45 @@ from evaluator import Evaluator
 from predictor import Predictor
 from plotting import plot_batch_prediction
 # Memory survey
+import numpy as np
 import linecache
 import tracemalloc
+
+
+def displayMonitoring(metrics, epoch):
+#(ax1, metrics, exp_name, color_palette, epoch, figure_ix, separate_values_dict, do_validation):
+
+    monitor_values_keys = metrics['train']['monitor_values'][1][0].keys()
+    # separate_values = [v for fig_ix in separate_values_dict.values() for v in fig_ix]
+    # if figure_ix == 0:
+    #    plot_keys = [ii for ii in monitor_values_keys if ii not in separate_values]
+    #    plot_keys += [k for k in metrics['train'].keys() if k != 'monitor_values']
+    # else:
+    #    plot_keys = separate_values_dict[figure_ix]
+    plot_keys = [ii for ii in monitor_values_keys]
+    plot_keys += [k for k in metrics['train'].keys() if k != 'monitor_values']
+
+    x = np.arange(1, epoch + 1)
+    for kix, pk in enumerate(plot_keys):
+        if pk in metrics['train'].keys():
+            y_train = metrics['train'][pk][1:]
+            # if do_validation:
+            #    y_val = metrics['val'][pk][1:]
+            y_val = metrics['val'][pk][1:]
+        else:
+            y_train = [np.mean([er[pk] for er in metrics['train']['monitor_values'][e]]) for e in x]
+            # if do_validation:
+            #    y_val = [np.mean([er[pk] for er in metrics['val']['monitor_values'][e]]) for e in x]
+            y_val = [np.mean([er[pk] for er in metrics['val']['monitor_values'][e]]) for e in x]
+        # ax1.plot(x, y_train, label='train_{}'.format(pk), linestyle='--', color=color_palette[kix])
+        print("train")
+        print(x)
+        print(y_train)
+        print(y_val)
+        # if do_validation:
+        #    ax1.plot(x, y_val, label='val_{}'.format(pk), linestyle='-', color=color_palette[kix])
+    # if epoch == 1:
+
 
 def display_top(snapshot, key_type='lineno', limit=10):
     snapshot = snapshot.filter_traces((
@@ -136,10 +173,12 @@ def train(logger):
                     # del batch
 
                 _, monitor_metrics['val'] = val_evaluator.evaluate_predictions(val_results_list, monitor_metrics['val'])
+                # print("monitor_metrics",monitor_metrics)
                 model_selector.run_model_selection(net, optimizer, monitor_metrics, epoch)
 
             # update monitoring and prediction plots
             # GG Covid-19 TrainingPlot.update_and_save(monitor_metrics, epoch)
+            displayMonitoring( monitor_metrics, epoch )
             epoch_time = time.time() - start_time
             logger.info('trained epoch {}: took {} sec. ({} train / {} val)'.format(
                 epoch, epoch_time, train_time, epoch_time-train_time))
